@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.maz_cache/
+.maz_routing.jsonl
+outputs/
+.DS_Store
+*.so
+*.dylib

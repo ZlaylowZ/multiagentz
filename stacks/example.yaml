@@ -1,0 +1,41 @@
+# stacks/example.yaml
+# ──────────────────────────────────────────────────────────────────────
+# Example: Two-agent stack for any project with a backend + frontend.
+#
+# Usage:
+#   maz --config stacks/example.yaml
+#
+# Customize:
+#   1. Change repo_path to your project directories
+#   2. Update key_files to point to your important source files
+#   3. Adjust descriptions and system prompts
+# ──────────────────────────────────────────────────────────────────────
+
+name: my-project
+
+lead:
+  # Keywords help the router quickly decide which agent to use
+  keywords:
+    backend: [api, endpoint, database, server, route, model, migration]
+    frontend: [react, component, page, hook, css, ui, button, form]
+
+  agents:
+    backend:
+      repo_path: /path/to/your/backend
+      description: Backend API and database layer
+      system_prompt: |
+        You are an expert on the backend service.
+        Answer questions grounded in the actual source code.
+      key_files:
+        - src/
+        - README.md
+
+    frontend:
+      repo_path: /path/to/your/frontend
+      description: React frontend application
+      system_prompt: |
+        You are an expert on the frontend application.
+        Answer questions grounded in the actual source code.
+      key_files:
+        - src/
+        - package.json

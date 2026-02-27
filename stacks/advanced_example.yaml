@@ -1,0 +1,114 @@
+# stacks/advanced_example.yaml
+# ──────────────────────────────────────────────────────────────────────
+# Advanced example: Multi-provider stack with cross-pollination,
+# coordinators, and perspective orchestration.
+#
+# This demonstrates the full power of multiagentz:
+#   - Different AI models for different agents (cost optimization)
+#   - Coordinator groups (nested routing)
+#   - A/B twin agents with cross-pollination
+#   - Perspective orchestration mode
+#
+# Usage:
+#   maz --config stacks/advanced_example.yaml
+# ──────────────────────────────────────────────────────────────────────
+
+name: my-advanced-project
+
+# ── Orchestration Mode ─────────────────────────────────────────────
+orchestration:
+  mode: perspective          # Options: standard | consensus | perspective
+  max_iterations: 3          # Refinement cycles before stopping
+  cross_pollination: true    # Enable A/B twin agent loops
+
+# ── Lead Agent ─────────────────────────────────────────────────────
+lead:
+  model: claude-sonnet-4-20250514  # Smart model for routing decisions
+
+  routing_prompt_extra: |
+    This is a full-stack web application with a Python backend,
+    React frontend, and shared documentation.
+
+    Routing rules:
+    - API questions -> backend group
+    - UI questions -> frontend
+    - Architecture questions -> both groups
+    - Documentation -> docs
+
+  keywords:
+    app_core:
+      - api
+      - endpoint
+      - database
+      - server
+      - authentication
+    frontend:
+      - react
+      - component
+      - hook
+      - css
+      - ui
+    docs:
+      - documentation
+      - readme
+      - guide
+      - tutorial
+
+  agents:
+    # ── Coordinator Group: Backend ───────────────────────────────
+    # Groups related agents under a single coordinator.
+    # The coordinator routes internally among its children.
+    app_core:
+      type: coordinator
+      description: >
+        Backend application — API endpoints, database models,
+        authentication, business logic.
+      routing_prompt_extra: |
+        - **CoreA**: Primary backend expert (Claude model)
+        - **CoreB**: Secondary backend expert (different model for diversity)
+      agents:
+        CoreA:
+          repo_path: /path/to/your/backend
+          description: Backend expert — API, database, auth (primary)
+          model: claude-sonnet-4-20250514
+          system_prompt: |
+            You are an expert on the backend service.
+            Focus on API design, database models, and business logic.
+          key_files:
+            - src/
+            - README.md
+          twin: CoreB   # Links this as an A/B pair with CoreB
+
+        CoreB:
+          repo_path: /path/to/your/backend
+          description: Backend expert — API, database, auth (secondary)
+          model: grok-4-1-fast-non-reasoning  # Different model = different perspective
+          system_prompt: |
+            You are an expert on the backend service.
+            Focus on API design, database models, and business logic.
+          key_files:
+            - src/
+            - README.md
+          twin: CoreA
+
+    # ── Simple Agent: Frontend ───────────────────────────────────
+    frontend:
+      repo_path: /path/to/your/frontend
+      description: React frontend — components, hooks, styling, state
+      model: gemini-2.0-flash   # Fast and cheap for frontend queries
+      system_prompt: |
+        You are an expert on the React frontend application.
+      key_files:
+        - src/
+        - package.json
+
+    # ── Simple Agent: Docs ───────────────────────────────────────
+    docs:
+      repo_path: /path/to/your/docs
+      description: Project documentation, guides, and API reference
+      model: claude-sonnet-4-20250514
+      system_prompt: |
+        You are an expert on the project documentation.
+      key_files:
+        - docs/
+        - README.md

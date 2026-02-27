@@ -1,0 +1,127 @@
+# stacks/template.yaml
+# ──────────────────────────────────────────────────────────────────────
+# Full reference template with all options documented.
+# Copy this file and customize for your project.
+#
+# Usage:
+#   maz --config stacks/my-stack.yaml
+# ──────────────────────────────────────────────────────────────────────
+
+name: my-project
+
+# ── Orchestration (optional) ───────────────────────────────────────
+# orchestration:
+#   mode: standard              # Options: standard | consensus | perspective
+#   max_iterations: 3           # Refinement cycles (consensus/perspective)
+#   cross_pollination: false    # Enable A/B twin agent loops
+
+# ── Lead Agent Configuration ──────────────────────────────────────
+lead:
+  # model: claude-sonnet-4-20250514   # Optional: model for routing decisions
+
+  routing_prompt_extra: |
+    Describe your project here. This helps the router
+    make better decisions about which agent to query.
+
+    Example:
+    This is a web application with a Python API backend
+    and a React frontend. Questions about endpoints,
+    database, or server logic go to the backend agent.
+    Questions about UI, components, or hooks go to frontend.
+
+  keywords:
+    backend:
+      - api
+      - endpoint
+      - database
+      - server
+      - model
+      - migration
+    frontend:
+      - react
+      - component
+      - page
+      - hook
+      - css
+      - ui
+
+  agents:
+    # ── Simple Sub-Agent ─────────────────────────────────────────
+    backend:
+      repo_path: /path/to/your/backend
+      description: >
+        Backend API — endpoints, database models, authentication,
+        business logic.
+      system_prompt: |
+        You are an expert on the backend service.
+        Answer questions grounded in the actual source code.
+      # model: claude-sonnet-4-20250514  # Optional: per-agent model
+      key_files:
+        - src/
+        - README.md
+      # max_tokens: 32768          # Optional (default: 32768)
+      # max_context_chars: 600000  # Optional (default: 600,000)
+
+    # ── Another Sub-Agent ────────────────────────────────────────
+    frontend:
+      repo_path: /path/to/your/frontend
+      description: >
+        React frontend — components, hooks, styling, routing.
+      system_prompt: |
+        You are an expert on the frontend application.
+      # model: gemini-2.0-flash    # Optional: use a different/cheaper model
+      key_files:
+        - src/
+        - package.json
+
+    # ── Coordinator (groups child agents) ────────────────────────
+    # infrastructure:
+    #   type: coordinator
+    #   description: >
+    #     Groups infrastructure-related agents under one coordinator.
+    #   routing_prompt_extra: |
+    #     - **devops**: CI/CD, Docker, deployment
+    #     - **database**: Schema, migrations, queries
+    #   agents:
+    #     devops:
+    #       repo_path: /path/to/infra
+    #       description: CI/CD and deployment expert
+    #       key_files: [Dockerfile, .github/workflows/]
+    #     database:
+    #       repo_path: /path/to/db
+    #       description: Database schema and migration expert
+    #       key_files: [migrations/, schema.sql]
+
+    # ── Twin Agents (cross-pollination) ──────────────────────────
+    # Requires: orchestration.cross_pollination: true
+    #
+    # twin_group:
+    #   type: coordinator
+    #   description: A/B twin pair for diverse perspectives
+    #   agents:
+    #     AgentA:
+    #       repo_path: /path/to/code
+    #       model: claude-sonnet-4-20250514
+    #       description: Primary expert
+    #       key_files: [src/]
+    #       twin: AgentB
+    #     AgentB:
+    #       repo_path: /path/to/code
+    #       model: grok-4-1-fast-non-reasoning
+    #       description: Secondary expert (different model)
+    #       key_files: [src/]
+    #       twin: AgentA
+
+# ── Optional Settings ─────────────────────────────────────────────
+# disable_files_agent: false    # Set true to exclude FileHandlerAgent
+# cache_ttl_hours: 72           # Default cache TTL in hours
+
+# ═══════════════════════════════════════════════════════════════════
+# Quick Start:
+# 1. Copy this file: cp stacks/template.yaml stacks/my-stack.yaml
+# 2. Update repo_path for each agent
+# 3. Update key_files to point to your important source files
+# 4. Customize descriptions and system prompts
+# 5. Add your API keys to multiagentz/providers.py
+# 6. Run: maz --config stacks/my-stack.yaml
+# ═══════════════════════════════════════════════════════════════════

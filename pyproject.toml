@@ -1,0 +1,28 @@
+[project]
+name = "multiagentz"
+version = "0.3.0"
+description = "Multi-agent orchestration framework — define AI agent teams in YAML, run them from your terminal"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "httpx>=0.25",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.30"]
+openai = ["openai>=1.30"]
+all = ["anthropic>=0.30", "openai>=1.30"]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+maz = "multiagentz.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["multiagentz*"]
+exclude = ["stacks*", "outputs*", "*.egg-info", "__pycache__"]

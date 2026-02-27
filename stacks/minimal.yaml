@@ -1,0 +1,32 @@
+# examples/minimal.yaml
+# ──────────────────────────────────────────────────────────────────────
+# Minimal example: a two-agent stack for any project with a
+# backend + frontend split.
+#
+# Usage:
+#   maz --config examples/minimal.yaml
+# ──────────────────────────────────────────────────────────────────────
+
+name: my-project
+
+lead:
+  keywords:
+    backend: [api, endpoint, database, server, route, model, migration]
+    frontend: [react, component, page, hook, css, ui, button, form]
+
+  agents:
+    backend:
+      repo_path: /path/to/backend
+      description: Backend API and database layer
+      system_prompt: You are an expert on the backend service.
+      key_files:
+        - src/
+        - README.md
+
+    frontend:
+      repo_path: /path/to/frontend
+      description: React frontend application
+      system_prompt: You are an expert on the frontend app.
+      key_files:
+        - src/
+        - package.json
