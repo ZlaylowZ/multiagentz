@@ -132,6 +132,20 @@ class LLMClient:
         
         self._base_url = llm_config.get_base_url_for_provider(self._provider)
         
+        # Validate before constructing SDK client
+        if not self._api_key:
+            from multiagentz.llm_config import _is_key_configured
+            configured = [
+                p for p in ["anthropic", "openai", "xai", "google"]
+                if _is_key_configured(llm_config.get_api_key_for_provider(p))
+            ]
+            hint = f" Configured providers: {configured}." if configured else ""
+            raise ValueError(
+                f"No API key for provider '{self._provider}' "
+                f"(model: {self._model}).{hint} "
+                f"Edit multiagentz/providers.py to add your key."
+            )
+
         # Initialize SDK client
         self._client = _get_raw_client(
             self._provider,

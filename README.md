@@ -21,6 +21,9 @@ pip install -e ".[all]"
 maz --config stacks/example.yaml
 ```
 
+> **New to this?** See [SETUP.md](SETUP.md) for a complete beginner walkthrough with Claude Code.
+> **Want the full picture?** See [GUIDE.md](GUIDE.md) for the user guide covering all complexity levels and the maz → Claude Code workflow.
+
 ## Features
 
 - **Declarative YAML** — Define agent teams without writing code
@@ -120,7 +123,7 @@ PROVIDERS = {
 }
 ```
 
-You only need **one** provider to get started.
+You only need **one** provider to get started. For cross-pollination (twin agents), you need at least **two**.
 
 ### YAML Stack Reference
 

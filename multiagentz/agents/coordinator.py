@@ -12,11 +12,14 @@ Can be used as a top-level lead agent or as a nested sub-coordinator.
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from multiagentz.llm_client import LLMClient, CompletionResult
 from multiagentz.agents.base import SubAgent
+from multiagentz.utils import extract_json, extract_routing_task
+from multiagentz import log as _log
 
 
 MAX_CONTINUATIONS = 6
@@ -98,65 +101,9 @@ Sub-agents:
 }}
 ```"""
 
-    @staticmethod
-    def _extract_json(text: str) -> dict:
-        """Extract JSON from LLM response, handling markdown fences."""
-        text = text.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        return json.loads(text.strip())
-
-    @staticmethod
-    def _extract_routing_task(question: str) -> str:
-        """
-        Extract the core task from a question for routing purposes.
-
-        Refinement prompts contain the full previous solution + LEAD feedback
-        which overwhelms the routing classifier. Strip that down to just the
-        task description.
-        """
-        # Detect refinement-style prompts
-        refinement_markers = [
-            "Your previous solution proposal:",
-            "Your previous solution:",
-            "LEAD feedback:",
-            "Required improvements:",
-            "Provide refined solution",
-        ]
-        is_refinement = any(marker in question for marker in refinement_markers)
-
-        if is_refinement:
-            # For refinement prompts, extract what needs to be refined.
-            # The useful routing info is in the feedback section, not the
-            # full solution dump.
-            parts = []
-            for marker in ["Weaknesses:", "Required improvements:", "Provide refined solution"]:
-                idx = question.find(marker)
-                if idx != -1:
-                    # Grab up to 500 chars from this section
-                    parts.append(question[idx:idx + 500])
-            if parts:
-                return (
-                    "[Refinement request] The following areas need improvement:\n\n"
-                    + "\n\n".join(parts)
-                )
-
-        # Standard truncation for long questions
-        if len(question) > 2000:
-            return (
-                question[:1500]
-                + "\n\n[... question continues for "
-                + f"{len(question):,} total chars ...]\n\n"
-                + question[-500:]
-            )
-
-        return question
-
     def _route(self, question: str) -> dict:
         # Summarize/extract for routing classification
-        routing_q = self._extract_routing_task(question)
+        routing_q = extract_routing_task(question)
 
         system = self._routing_prompt()
 
@@ -167,7 +114,7 @@ Sub-agents:
             max_tokens=2048,
         )
         try:
-            result = self._extract_json(str(response))
+            result = extract_json(str(response))
             # Cache successful routing decision
             self._last_successful_route = [q["agent"] for q in result.get("queries", [])]
             return result
@@ -175,7 +122,7 @@ Sub-agents:
             pass
 
         # Attempt 2 — retry with explicit instruction
-        print(f"  [{self.name}] Routing parse failed, retrying...")
+        _log.warn(f"{self.name}: routing retry (JSON parse failed)")
         response = self._llm.complete(
             prompt=(
                 f"Question: {routing_q}\n\n"
@@ -185,7 +132,7 @@ Sub-agents:
             max_tokens=2048,
         )
         try:
-            result = self._extract_json(str(response))
+            result = extract_json(str(response))
             # Cache successful routing decision
             self._last_successful_route = [q["agent"] for q in result.get("queries", [])]
             return result
@@ -195,7 +142,7 @@ Sub-agents:
         # Final fallback: use LAST SUCCESSFUL routing decision if available
         if self._last_successful_route:
             agents = self._last_successful_route
-            print(f"  [{self.name}] Routing failed after retry — reusing last successful route: {agents}")
+            _log.warn(f"{self.name}: routing failed, reusing last route")
             return {
                 "reasoning": f"Parse failed, reusing last successful route: {agents}",
                 "queries": [
@@ -205,7 +152,7 @@ Sub-agents:
             }
 
         # No cached route — fall back to ALL, but warn loudly
-        print(f"  [{self.name}] WARNING: Routing failed after retry with NO cached route, querying ALL sub-agents")
+        _log.warn(f"{self.name}: routing failed — querying ALL sub-agents")
         return {
             "reasoning": "Parse failed after retry (no cache), querying all",
             "queries": [
@@ -235,7 +182,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         for _ in range(MAX_CONTINUATIONS):
             if not getattr(result, "truncated", False):
                 break
-            print(f"  [{self.name}] Synthesis truncated — continuing…")
+            _log.warn(f"{self.name}: synthesis truncated, continuing...")
             result = self._llm.complete(
                 prompt=(
                     f"Continue EXACTLY where this left off. Do not repeat.\n\n"
@@ -283,17 +230,18 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
     # ── Main entry ──────────────────────────────────────────────────────
 
     def query(self, question: str) -> str:
+        t0 = time.time()
         routing = self._route(question)
-        print(f"  [{self.name}] Routing: {routing.get('reasoning', '')[:80]}")
 
         queries = routing.get("queries", [])
         routed_agents = [q["agent"] for q in queries]
+        _log.coord(self.name, f"→ {', '.join(routed_agents)}")
 
         # Check for cross-pollination twin pair
         twin_pair = self._find_twin_for_routed(routed_agents)
         if twin_pair:
             a_name, b_name = twin_pair
-            print(f"  [{self.name}] Cross-pollination: {a_name} <-> {b_name}")
+            _log.coord(self.name, f"Cross-poll: {a_name} ↔ {b_name}")
             engine = self._get_cross_poll_engine()
             result, _metadata = engine.execute(
                 question=question,
@@ -301,6 +249,8 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
                 agent_b=self.sub_agents[b_name],
                 coordinator_name=self.name,
             )
+            elapsed = time.time() - t0
+            _log.coord(self.name, f"Done ({elapsed:.1f}s)")
             return result
 
         # Standard path: parallel query + synthesis
@@ -310,8 +260,8 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
             agent_name = spec["agent"]
             q = spec["question"]
             if agent_name in self.sub_agents:
-                print(f"  [{self.name}] Querying {agent_name}...")
                 return agent_name, self.sub_agents[agent_name].query(q)
+            _log.warn(f"{self.name}: unknown agent '{agent_name}'")
             return None, None
 
         if queries:
@@ -322,7 +272,16 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
                     responses[name] = resp
 
         if not responses:
+            _log.warn(f"{self.name}: no agents responded")
             return "No sub-agents responded."
+
         if len(responses) == 1:
+            elapsed = time.time() - t0
+            _log.coord(self.name, f"Done ({elapsed:.1f}s)")
             return next(iter(responses.values()))
-        return self._synthesize(question, responses)
+
+        _log.coord(self.name, "Synthesizing...")
+        result = self._synthesize(question, responses)
+        elapsed = time.time() - t0
+        _log.coord(self.name, f"Done ({elapsed:.1f}s)")
+        return result

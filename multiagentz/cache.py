@@ -21,7 +21,7 @@ class PersistentCache:
 
     def _hash_query(self, question: str, context: str = "") -> str:
         content = f"{question}:{context}"
-        return hashlib.sha256(content.encode()).hexdigest()[:16]
+        return hashlib.sha256(content.encode()).hexdigest()[:32]
 
     def get(self, question: str, context: str = "") -> Optional[Tuple[str, list]]:
         key = self._hash_query(question, context)

@@ -22,6 +22,8 @@ from typing import Optional
 
 from multiagentz.cache import PersistentCache
 from multiagentz.llm_client import LLMClient, CompletionResult
+from multiagentz.utils import extract_json, extract_routing_task
+from multiagentz import log as _log
 
 # Type-only import to avoid circular deps
 from typing import TYPE_CHECKING
@@ -84,9 +86,9 @@ class LeadAgent:
         self._lead_sub_manager = None  # Lazy init
         self._last_successful_route: Optional[list[str]] = None  # Cache for fallback
 
-        print(f"[{self.name}] Agents: {list(self.agents.keys())}")
-        print(f"[{self.name}] LLM: {self._llm.provider} / {self._llm.model}")
-        print(f"[{self.name}] Orchestration mode: {orchestration_mode}")
+        _log.lead(self.name, f"Agents: {', '.join(self.agents.keys())}")
+        _log.lead(self.name, f"LLM: {self._llm.provider}/{self._llm.model}")
+        _log.lead(self.name, f"Mode: {orchestration_mode}")
 
     # ── Orchestration integration ──────────────────────────────────────
 
@@ -140,7 +142,7 @@ class LeadAgent:
 
     # ── Similarity detection ───────────────────────────────────────────
 
-    def _check_similar(self, question: str, threshold: float = 0.7) -> tuple[bool, str]:
+    def _check_similar(self, question: str, threshold: float = 0.85) -> tuple[bool, str]:
         q = question.lower().strip()
         for prev_q, prev_r in self._recent:
             if SequenceMatcher(None, q, prev_q.lower()).ratio() > threshold:
@@ -201,63 +203,13 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
 
     # ── Route ──────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _extract_json(text: str) -> dict:
-        """Extract JSON from LLM response, handling markdown fences."""
-        text = text.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        return json.loads(text.strip())
-
-    @staticmethod
-    def _extract_routing_task(question: str) -> str:
-        """
-        Extract the core task from a question for routing purposes.
-
-        Refinement prompts contain the full previous solution + LEAD feedback
-        which overwhelms the routing classifier. Strip that down to just the
-        task description.
-        """
-        refinement_markers = [
-            "Your previous solution proposal:",
-            "Your previous solution:",
-            "LEAD feedback:",
-            "Required improvements:",
-            "Provide refined solution",
-        ]
-        is_refinement = any(marker in question for marker in refinement_markers)
-
-        if is_refinement:
-            parts = []
-            for marker in ["Weaknesses:", "Required improvements:", "Provide refined solution"]:
-                idx = question.find(marker)
-                if idx != -1:
-                    parts.append(question[idx:idx + 500])
-            if parts:
-                return (
-                    "[Refinement request] The following areas need improvement:\n\n"
-                    + "\n\n".join(parts)
-                )
-
-        if len(question) > 2000:
-            return (
-                question[:1500]
-                + "\n\n[... question continues for "
-                + f"{len(question):,} total chars ...]\n\n"
-                + question[-500:]
-            )
-
-        return question
-
     def _route_query(self, question: str, memory_context: str = "") -> dict:
         hint = self._pre_route_hint(question)
         if hint:
-            print(f"[{self.name}] Pre-route hint: {hint}")
+            _log.detail(f"Pre-route hint: {hint}")
 
         # Extract routing-friendly version of the question
-        routing_q = self._extract_routing_task(question)
+        routing_q = extract_routing_task(question)
 
         prompt = f"User question:\n{routing_q}"
         if memory_context:
@@ -269,14 +221,14 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
         response = self._llm.complete(prompt=prompt, system=system, max_tokens=2048)
         parsed = None
         try:
-            parsed = self._extract_json(str(response))
+            parsed = extract_json(str(response))
             self._last_successful_route = [q["agent"] for q in parsed.get("queries", [])]
         except (json.JSONDecodeError, IndexError):
             pass
 
         # Attempt 2 — retry with very explicit instruction
         if parsed is None:
-            print(f"[{self.name}] Routing parse failed on attempt 1, retrying...")
+            _log.warn("Routing retry (JSON parse failed)")
             retry_prompt = (
                 f"{prompt}\n\n"
                 "IMPORTANT: You MUST respond with ONLY a JSON object. "
@@ -284,7 +236,7 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
             )
             response = self._llm.complete(prompt=retry_prompt, system=system, max_tokens=2048)
             try:
-                parsed = self._extract_json(str(response))
+                parsed = extract_json(str(response))
                 self._last_successful_route = [q["agent"] for q in parsed.get("queries", [])]
             except (json.JSONDecodeError, IndexError):
                 pass
@@ -300,7 +252,7 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
             else:
                 fallback_agents = list(self.agents.keys())
                 reasoning = f"Routing parse failed (no cache, no hint) — broadcasting to ALL: {fallback_agents}"
-            print(f"[{self.name}] WARNING: {reasoning}")
+            _log.warn(reasoning)
             parsed = {
                 "reasoning": reasoning,
                 "queries": [{"agent": a, "question": question} for a in fallback_agents],
@@ -316,7 +268,7 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
             if not any(sig in reasoning for sig in override_signals):
                 if hint not in routed:
                     parsed["queries"] = [{"agent": hint, "question": question}]
-                    print(f"[{self.name}] Post-route guard: forced '{hint}'")
+                    _log.detail(f"Post-route guard: override with hint '{hint}'")
 
         # Audit log
         routed_to = [q["agent"] for q in parsed.get("queries", [])]
@@ -335,17 +287,21 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
             name = spec["agent"]
             q = spec["question"]
             if name in self.agents:
-                print(f"[{self.name}] Querying {name}...")
+                _log.detail(f"Dispatching to: {name}")
                 return name, self.agents[name].query(q)
             return None, None
 
         if queries:
             futures = [self._executor.submit(_query_one, s) for s in queries]
             for f in futures:
-                name, resp = f.result()
-                if name:
-                    agents_used.append(name)
-                    responses[name] = resp
+                try:
+                    name, resp = f.result()
+                    if name:
+                        agents_used.append(name)
+                        responses[name] = resp
+                except Exception as e:
+                    _log.error(f"Agent query failed: {e}")
+                    continue
 
         if not responses:
             return "No agents responded.", agents_used
@@ -381,7 +337,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         for _ in range(MAX_CONTINUATIONS):
             if not getattr(result, "truncated", False):
                 break
-            print(f"[{self.name}] Response truncated — continuing…")
+            _log.warn("Response truncated, continuing...")
             result = self._llm.complete(
                 prompt=(
                     f"Continue EXACTLY where this left off. Do not repeat.\n\n"
@@ -412,7 +368,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         if self.lead_sub.current_lead_sub:
             if self.lead_sub.should_route_to_lead_sub(user_question):
                 lead_sub_name = self.lead_sub.current_lead_sub
-                print(f"[{self.name}] Routing to LEAD_SUB: {lead_sub_name}")
+                _log.lead(self.name, f"→ LEAD_SUB: {lead_sub_name}")
                 response = self.agents[lead_sub_name].query(user_question)
                 return response, [lead_sub_name]
         
@@ -421,7 +377,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         # Similarity check
         is_similar, prev = self._check_similar(user_question)
         if is_similar:
-            print(f"[{self.name}] Similar question recently asked")
+            _log.detail("Similar question — returning cached answer")
             return (
                 f"I just answered a similar question:\n\n{prev[:2000]}...\n\n"
                 "Would you like me to elaborate?",
@@ -431,7 +387,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         # Cache check
         cached = self._cache.get(user_question, memory_context)
         if cached:
-            print(f"[{self.name}] Cache hit")
+            _log.detail("Cache hit")
             return cached
 
         # Route based on orchestration mode
@@ -470,7 +426,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
                 for name in coordinator_names
             ]
 
-            print(f"[{self.name}] Perspective mode: broadcasting to ALL coordinators: {coordinator_names}")
+            _log.lead(self.name, f"Perspective mode: {len(coordinator_names)} perspectives")
             result, metadata = self.query_perspective(
                 user_question,
                 perspective_configs,
@@ -497,7 +453,7 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
             first_agent = next(iter(self.agents))
             queries = [{"agent": first_agent, "question": user_question}]
 
-        print(f"[{self.name}] Routing to: {[q['agent'] for q in queries]}")
+        _log.lead(self.name, f"→ {', '.join(q['agent'] for q in queries)}")
 
         result, agents_used = self._query_knowledge(queries, user_question, memory_context)
 
@@ -508,7 +464,32 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         self._track_recent(user_question, result)
 
         return result, agents_used
-    
+
+    def query_standard(self, user_question: str,
+                       memory: Optional["SessionMemory"] = None) -> tuple[str, list[str]]:
+        """
+        Force standard routing regardless of orchestration_mode.
+
+        Used by _bootstrap_perspectives to answer Q&A questions without
+        recursively re-entering perspective mode.
+        """
+        memory_context = memory.get_context() if memory else ""
+
+        routing = self._route_query(user_question, memory_context)
+
+        if routing.get("can_answer_directly"):
+            return routing.get("direct_answer", ""), []
+
+        queries = routing.get("queries", [])
+        if not queries:
+            first_agent = next(iter(self.agents))
+            queries = [{"agent": first_agent, "question": user_question}]
+
+        _log.detail(f"Standard routing to: {', '.join(q['agent'] for q in queries)}")
+
+        result, agents_used = self._query_knowledge(queries, user_question, memory_context)
+        return result, agents_used
+
     def query_perspective(
         self,
         question: str,

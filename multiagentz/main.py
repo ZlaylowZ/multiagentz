@@ -117,27 +117,74 @@ def export_response(response: str, question: str, fmt: str = "html",
 
 
 def print_help():
+    table = Table(title="Commands", show_header=True, header_style="bold cyan")
+    table.add_column("Command", style="green", min_width=24)
+    table.add_column("Description")
 
-    def print_orchestration_status(lead):
-        """Display orchestration configuration and state."""
-        table = Table(title="Orchestration Status", show_header=True)
-        table.add_column("Setting", style="cyan")
-        table.add_column("Value", style="green")
-        
-        table.add_row("Mode", lead.orchestration_mode)
-        table.add_row("Max Iterations", str(lead.orchestration_config.get("max_iterations", 3)))
-        
-        # LEAD_SUB status
-        lead_sub = lead.lead_sub.current_lead_sub
-        table.add_row("LEAD_SUB", lead_sub or "(none)")
-        
-        # Available perspectives
-        perspectives = lead.orchestration_config.get("perspectives", [])
-        if perspectives:
-            p_names = ", ".join(p.get("name", "?") for p in perspectives)
-            table.add_row("Configured Perspectives", p_names)
-        
-        console.print(table)
+    commands = [
+        ("/help", "Show this help"),
+        ("/clear", "Clear conversation memory"),
+        ("/cache", "Show cache stats"),
+        ("/cache clear", "Clear the cache"),
+        ("/file <path>", "Load file contents as your question"),
+        ("/paste", "Multi-line input mode (type END to finish)"),
+        ("/watch <path>", "Watch a file or directory"),
+        ("/unwatch <path>", "Stop watching a path"),
+        ("/watched", "List watched paths"),
+        ("/clear-watched", "Clear all watched paths"),
+        ("/context", "Show watched file context stats"),
+        ("/scan <path>", "Watch + auto-summarize a path"),
+        ("/brief", "Toggle brief response mode"),
+        ("/export [html|md|txt]", "Export last response to file"),
+        ("/status", "Show orchestration status"),
+        ("/promote <agent>", "Promote agent to LEAD_SUB"),
+        ("/demote", "Demote current LEAD_SUB"),
+        ("/consensus <question>", "Force consensus mode for a query"),
+        ('/perspective "<q>" [agents]', "Multi-perspective analysis"),
+        ("quit", "Exit"),
+    ]
+    for cmd, desc in commands:
+        table.add_row(cmd, desc)
+
+    console.print(table)
+    console.print()
+
+
+def print_orchestration_status(lead):
+    """Display orchestration configuration and state."""
+    table = Table(title="Orchestration Status", show_header=True)
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Mode", lead.orchestration_mode)
+    table.add_row("Max Iterations", str(lead.orchestration_config.get("max_iterations", 3)))
+
+    # LEAD_SUB status
+    lead_sub = lead.lead_sub.current_lead_sub
+    table.add_row("LEAD_SUB", lead_sub or "(none)")
+
+    # Available perspectives
+    perspectives = lead.orchestration_config.get("perspectives", [])
+    if perspectives:
+        p_names = ", ".join(p.get("name", "?") for p in perspectives)
+        table.add_row("Configured Perspectives", p_names)
+
+    # Cross-pollination
+    twin_map = lead.orchestration_config.get("twin_map", {})
+    if twin_map:
+        pairs = []
+        seen = set()
+        for a, b in twin_map.items():
+            pair = tuple(sorted([a, b]))
+            if pair not in seen:
+                pairs.append(f"{a} ↔ {b}")
+                seen.add(pair)
+        table.add_row("Twin Pairs", ", ".join(pairs))
+
+    # Agents
+    table.add_row("Agents", ", ".join(lead.agents.keys()))
+
+    console.print(table)
 
 
 # ── Main loop ───────────────────────────────────────────────────────────

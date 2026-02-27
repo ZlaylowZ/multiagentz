@@ -25,12 +25,13 @@ class FileHandlerAgent:
     }
 
     MAX_CONTEXT_CHARS = 600_000
-    WATCH_FILE = Path("~/.maz_watched.json").expanduser()
 
     def __init__(self, watched_paths: Optional[list[str]] = None, llm_client: Optional[LLMClient] = None):
         self.name = "files"
         self.watched_paths: list[Path] = []
         self._llm = llm_client or LLMClient()
+        # Per-working-directory watch file (not global)
+        self._watch_file = Path(".maz_watched.json").resolve()
         self._load_watched()
         if watched_paths:
             for p in watched_paths:
@@ -43,10 +44,10 @@ class FileHandlerAgent:
     # ── Watch list management ───────────────────────────────────────────
 
     def _load_watched(self):
-        if self.WATCH_FILE.exists():
+        if self._watch_file.exists():
             try:
                 self.watched_paths = [
-                    Path(p) for p in json.loads(self.WATCH_FILE.read_text())
+                    Path(p) for p in json.loads(self._watch_file.read_text())
                     if Path(p).exists()
                 ]
             except Exception:
@@ -54,7 +55,7 @@ class FileHandlerAgent:
 
     def _save_watched(self):
         try:
-            self.WATCH_FILE.write_text(json.dumps([str(p) for p in self.watched_paths]))
+            self._watch_file.write_text(json.dumps([str(p) for p in self.watched_paths]))
         except Exception:
             pass
 

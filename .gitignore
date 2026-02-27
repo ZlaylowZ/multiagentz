@@ -7,6 +7,7 @@ dist/
 build/
 .maz_cache/
 .maz_routing.jsonl
+.maz_watched.json
 outputs/
 .DS_Store
 *.so

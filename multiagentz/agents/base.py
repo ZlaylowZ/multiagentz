@@ -7,16 +7,21 @@ key files into the LLM context window and answers questions grounded
 exclusively in that content. Everything domain-specific (name, description,
 system prompt, file list) is injected via constructor or YAML config —
 no subclassing required for simple agents.
+
+File contents are cached after the first load and reused for subsequent
+queries, eliminating redundant disk reads and log noise.
 """
 
 from __future__ import annotations
 
 import os
 import fnmatch
+import time
 from pathlib import Path
 from typing import Optional
 
 from multiagentz.llm_client import LLMClient, CompletionResult
+from multiagentz import log as _log
 
 
 # ── Defaults ────────────────────────────────────────────────────────────
@@ -83,6 +88,9 @@ class SubAgent:
         self.exclude_patterns = exclude_patterns or EXCLUDE_PATTERNS
         self.max_context_chars = max_context_chars
         self._llm = llm_client or LLMClient()
+        self._file_cache: Optional[str] = None  # Cached file context
+        self._file_cache_count: int = 0          # Number of cached files
+        self._file_cache_chars: int = 0          # Total cached chars
 
     # ── Public interface ────────────────────────────────────────────────
 
@@ -92,6 +100,7 @@ class SubAgent:
 
     def query(self, question: str, include_files: Optional[list[str]] = None) -> str:
         """Answer a question using loaded file context + LLM."""
+        t0 = time.time()
         file_context = self._load_file_contents()
 
         if include_files:
@@ -102,17 +111,27 @@ class SubAgent:
                         content = content[:200_000] + "\n... [truncated]"
                     file_context += f"\n\n=== {fp} ===\n{content}"
                 except Exception as e:
-                    print(f"[{self.name}] Warning: couldn't read {fp}: {e}")
+                    _log.warn(f"{self.name}: couldn't read extra file {fp}: {e}")
 
         full_system = self._build_full_system(file_context)
 
         try:
+            q_preview = question[:120].replace("\n", " ")
+            self._log(f"Sending to LLM ({self._llm.provider}/{self._llm.model})  \"{q_preview}...\"")
             response = self._llm.complete(
                 prompt=question, system=full_system, max_tokens=self.max_tokens,
             )
-            return self._continue_if_truncated(question, full_system, response)
+            result = self._continue_if_truncated(question, full_system, response)
+            elapsed = time.time() - t0
+            self._log(f"Done ({elapsed:.1f}s, {len(result):,} chars)")
+            return result
         except Exception as e:
+            _log.error(f"{self.name}: {e}")
             return f"Error querying {self.name}: {e}"
+
+    def _log(self, msg: str):
+        """Route to centralized logger (verbose only for sub-agents)."""
+        _log.agent(self.name, msg)
 
     # ── System prompt assembly ──────────────────────────────────────────
 
@@ -158,7 +177,7 @@ specific claims about code structure or behavior.
             if not getattr(response, "truncated", False):
                 break
 
-            print(f"[{self.name}] Response truncated — requesting continuation…")
+            _log.warn(f"{self.name}: response truncated, continuing...")
             continuation = (
                 f"{question}\n\n"
                 "--- PARTIAL RESPONSE SO FAR (do NOT repeat this) ---\n"
@@ -190,15 +209,13 @@ specific claims about code structure or behavior.
         for rel in self.key_files:
             full = self.repo_path / rel
             if not full.exists():
-                print(f"[{self.name}] Warning: key file not found: {rel}")
+                self._log(f"Warning: key file not found: {rel}")
                 continue
             if full.is_file():
                 resolved.append(str(full))
             elif full.is_dir():
                 dir_files = self._walk_directory(full)
                 resolved.extend(dir_files)
-                if dir_files:
-                    print(f"[{self.name}] Loaded {len(dir_files)} files from {rel}")
         return resolved
 
     def _walk_directory(self, dirpath: Path, max_depth: int = MAX_WALK_DEPTH) -> list[str]:
@@ -228,6 +245,12 @@ specific claims about code structure or behavior.
         return any(fnmatch.fnmatch(base, pat) for pat in self.exclude_patterns)
 
     def _load_file_contents(self) -> str:
+        """Load file contents, using cache after the first call."""
+        if self._file_cache is not None:
+            return self._file_cache
+
+        # First load — read from disk and cache
+        t0 = time.time()
         sections = []
         total = 0
         loaded = 0
@@ -253,11 +276,20 @@ specific claims about code structure or behavior.
             except IsADirectoryError:
                 pass
             except Exception as e:
-                print(f"[{self.name}] Warning: couldn't read {fp}: {e}")
+                self._log(f"Warning: couldn't read {fp}: {e}")
 
+        elapsed = time.time() - t0
         if skipped:
-            print(f"[{self.name}] Warning: skipped {skipped} files (context limit)")
-        if loaded:
-            print(f"[{self.name}] Loaded {loaded} files ({total:,} chars)")
+            self._log(f"Warning: {skipped} files skipped (context limit reached)")
+        self._log(f"Loaded {loaded} files ({total:,} chars) from disk in {elapsed:.2f}s")
 
-        return "\n\n".join(sections)
+        self._file_cache = "\n\n".join(sections)
+        self._file_cache_count = loaded
+        self._file_cache_chars = total
+        return self._file_cache
+
+    def invalidate_cache(self):
+        """Force re-read of files on next query (e.g. after file changes)."""
+        self._file_cache = None
+        self._file_cache_count = 0
+        self._file_cache_chars = 0
