@@ -206,6 +206,9 @@ A/B twin agents (different models) exchange outputs and refine. Produces cogniti
 | `stacks/template.yaml` | Full reference with all options |
 | `stacks/minimal.yaml` | Bare minimum starter |
 
+* **Built for Claude Code** — Run deep multi-agent analysis, get an auto-exported HTML artifact, and hand it directly to Claude Code for implementation. The hard thinking happens here; the building happens​​​​​​​​​​​​​​​​
+
+
 ## License
 
 MIT
