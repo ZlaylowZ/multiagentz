@@ -22,7 +22,7 @@ gh repo clone ZlaylowZ/multiagentz
 cd /Users/<username>/path/to/repo
 
 # 3. Install Python (preferably via homebrew) [ask agent for assistance if unsure)
-# Create a python venv and cd to its parent directory
+# Create a python venv and cd to its location
 
 source .venv/bin/activate
 
