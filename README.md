@@ -13,25 +13,26 @@ You describe your agent hierarchy in a YAML file — which code repositories eac
 ```bash
 
 # 1. Clone the repo via
+
 # brew install gh (and install homebrew if necesary)
 gh repo clone ZlaylowZ/multiagentz
 
-# 3. Change directory location of unzipped repo directory
+# 2. Change directory location of unzipped repo directory
 
 cd /Users/<username>/path/to/repo
 
-# 4. Install Python (preferably via homebrew) [ask agent for assistance if unsure)
+# 3. Install Python (preferably via homebrew) [ask agent for assistance if unsure)
 # Create a python venv and cd to its parent directory
 
 source .venv/bin/activate
 
-# 5. Install
+# 4. Install
 pip install -e ".[all]"
 
-# 6. Add your API key(s) to multiagentz/providers.py
+# 5. Add your API key(s) to multiagentz/providers.py
 # (just paste your key — no .env files needed)
 
-# 7. Run
+# 6. Run
 # First, use preferred LLM to construct YAML stack, then save the .yaml to multiagentz/stacks/example.yaml and then run
 
 maz --config stacks/example.yaml
