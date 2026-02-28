@@ -11,16 +11,31 @@ You describe your agent hierarchy in a YAML file — which code repositories eac
 ## Quick Start
 
 ```bash
-# 1. Install
+
+# 1. Clone the repo via
+# brew install gh (and install homebrew if necesary)
+gh repo clone ZlaylowZ/multiagentz
+
+# 3. Change directory location of unzipped repo directory
+
+cd /Users/<username>/path/to/repo
+
+# 4. Install Python (preferably via homebrew) [ask agent for assistance if unsure)
+# Create a python venv and cd to its parent directory
+
+source .venv/bin/activate
+
+# 5. Install
 pip install -e ".[all]"
 
-# 2. Add your API key(s) to multiagentz/providers.py
-#    (just paste your key — no .env files needed)
+# 6. Add your API key(s) to multiagentz/providers.py
+# (just paste your key — no .env files needed)
 
-# 3. Run
+# 7. Run
+# First, use preferred LLM to construct YAML stack, then save the .yaml to multiagentz/stacks/example.yaml and then run
+
 maz --config stacks/example.yaml
 ```
-
 > **New to this?** See [SETUP.md](SETUP.md) for a complete beginner walkthrough with Claude Code.
 > **Want the full picture?** See [GUIDE.md](GUIDE.md) for the user guide covering all complexity levels and the maz → Claude Code workflow.
 
@@ -206,7 +221,8 @@ A/B twin agents (different models) exchange outputs and refine. Produces cogniti
 | `stacks/template.yaml` | Full reference with all options |
 | `stacks/minimal.yaml` | Bare minimum starter |
 
-* **Built for Claude Code** — Run deep multi-agent analysis, get an auto-exported HTML artifact, and hand it directly to Claude Code for implementation. The hard thinking happens here; the building happens​​​​​​​​​​​​​​​​
+## Features
+**Built for Claude Code** — Run deep multi-agent analysis, get an auto-exported HTML artifact, and hand it directly to Claude Code for implementation. The hard thinking happens here; the building happens​​​​​​​​​​​​​​​​
 
 
 ## License
