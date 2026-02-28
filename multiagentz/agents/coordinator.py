@@ -238,13 +238,28 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
 
     # ── Main entry ──────────────────────────────────────────────────────
 
+    def _all_agents_twinned(self) -> bool:
+        """True if every sub-agent has a twin — routing is pointless."""
+        if not self._twin_map:
+            return False
+        return all(name in self._twin_map for name in self.sub_agents)
+
     def query(self, question: str) -> str:
         t0 = time.time()
-        routing = self._route(question)
 
-        queries = routing.get("queries", [])
-        routed_agents = [q["agent"] for q in queries]
-        _log.coord(self.name, f"→ {', '.join(routed_agents)}")
+        # Fast path: when every agent has a twin, routing doesn't matter —
+        # cross-poll always runs both.  Skip the expensive LLM routing call.
+        queries: list[dict] = []
+        if self._all_agents_twinned():
+            first_agent = next(iter(self.sub_agents))
+            routed_agents = [first_agent]
+            queries = [{"agent": first_agent, "question": question}]
+            _log.coord(self.name, f"→ {first_agent} (fast-route, all twins)")
+        else:
+            routing = self._route(question)
+            queries = routing.get("queries", [])
+            routed_agents = [q["agent"] for q in queries]
+            _log.coord(self.name, f"→ {', '.join(routed_agents)}")
 
         # Check for cross-pollination twin pair
         twin_pair = self._find_twin_for_routed(routed_agents)

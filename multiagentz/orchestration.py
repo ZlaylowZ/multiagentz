@@ -405,12 +405,24 @@ Begin by asking your first round of questions."""
                     aligned = True
                     break
 
-                log.step(f"{p_name}  Turn {turn + 1}/{max_qa_turns}: {len(questions)} question(s) — LEAD answering...")
+                log.step(f"{p_name}  Turn {turn + 1}/{max_qa_turns}: {len(questions)} question(s) — LEAD answering in parallel...")
+
+                # Answer ALL questions in parallel — each query_standard
+                # can trigger routing + sub-agent calls, so serializing
+                # them is the single biggest performance bottleneck.
+                def _answer_one(q: str) -> str:
+                    answer, _ = self.lead.query_standard(q, memory=memory)
+                    return f"**Q:** {q}\n**A:** {answer}"
 
                 lead_answers = []
-                for q in questions:
-                    answer, _ = self.lead.query_standard(q, memory=memory)
-                    lead_answers.append(f"**Q:** {q}\n**A:** {answer}")
+                with ThreadPoolExecutor(max_workers=len(questions)) as qa_pool:
+                    futures = [qa_pool.submit(_answer_one, q) for q in questions]
+                    for fut in futures:  # Preserve question order
+                        try:
+                            lead_answers.append(fut.result())
+                        except Exception as e:
+                            log.warn(f"{p_name}  LEAD answer failed ({type(e).__name__}), skipping")
+                            continue
 
                 qa_history.append(f"\n**{p_name} Questions:**\n{agent_response}")
                 qa_history.append(f"\n**LEAD Answers:**\n" + "\n\n".join(lead_answers))
@@ -447,7 +459,7 @@ Begin by asking your first round of questions."""
                 if len(cleaned) > 10:
                     questions.append(cleaned)
 
-        return questions[:10]
+        return questions[:5]
 
     def _generate_independent_solutions(
         self,

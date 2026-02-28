@@ -208,6 +208,18 @@ Your ONLY job is to output a JSON routing decision. Do NOT answer the question i
         if hint:
             _log.detail(f"Pre-route hint: {hint}")
 
+        # Fast path: if keyword hint matches AND there's only one agent (or
+        # hint is the sole candidate), skip the expensive LLM routing call.
+        if hint and (len(self.agents) == 1 or hint in self.agents):
+            _log.detail(f"Fast-route via keyword hint → {hint}")
+            self._last_successful_route = [hint]
+            self._log_routing(question, hint, [hint], f"keyword fast-route to {hint}")
+            return {
+                "reasoning": f"Keyword fast-route to {hint}",
+                "queries": [{"agent": hint, "question": question}],
+                "can_answer_directly": False,
+            }
+
         # Extract routing-friendly version of the question
         routing_q = extract_routing_task(question)
 
