@@ -32,9 +32,26 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Optional
 
-from multiagentz.llm_client import LLMClient
+from multiagentz.llm_client import LLMClient, CHARS_PER_TOKEN_ESTIMATE, MAX_INPUT_TOKENS
 from multiagentz.utils import parse_json_response
 from multiagentz import log
+
+# ── Prompt budget helpers ──────────────────────────────────────────────
+# Max chars for large text blocks injected into prompts.  Keeps the
+# assembled prompt well under the API's 200K-token input limit.
+_MAX_SECTION_CHARS: int = 300_000   # ~85K tokens — safe for one section
+_MAX_COMBINED_CHARS: int = 550_000  # ~157K tokens — safe for prompt total
+
+
+def _truncate_text(text: str, max_chars: int, label: str = "text") -> str:
+    """Truncate *text* with a warning marker if it exceeds *max_chars*."""
+    if len(text) <= max_chars:
+        return text
+    log.warn(f"Truncating {label} from {len(text):,} to {max_chars:,} chars")
+    return (
+        text[:max_chars]
+        + f"\n\n[... {label} truncated from {len(text):,} chars ...]"
+    )
 
 if TYPE_CHECKING:
     from multiagentz.lead import LeadAgent
@@ -402,7 +419,8 @@ Begin by asking your first round of questions."""
             if not aligned:
                 log.warn(f"{p_name}  Max Q&A turns ({max_qa_turns}) reached — moving on")
 
-            return p_name, "\n\n".join(filter(None, qa_history))
+            full_ctx = "\n\n".join(filter(None, qa_history))
+            return p_name, _truncate_text(full_ctx, _MAX_SECTION_CHARS, f"{p_name} Q&A context")
 
         # Run all perspectives in parallel
         log.step(f"Aligning {len(perspective_configs)} perspectives in parallel...")
@@ -448,6 +466,9 @@ Begin by asking your first round of questions."""
 
             agent = self.lead.agents[agent_ref]
             context = aligned_contexts.get(p_name, "")
+            # Cap context so agent.query() doesn't blow the token limit
+            # (agent adds its own file-based system prompt on top)
+            context = _truncate_text(context, _MAX_SECTION_CHARS, f"{p_name} aligned context")
 
             prompt = f"""{context}
 
@@ -504,13 +525,19 @@ Be specific and actionable. This is a solution proposal, not just analysis."""
             log.step(f"LEAD reviewing all solutions (iteration {iteration + 1}/{max_iterations})...")
 
             # LEAD reviews all solutions
+            # Budget: spread chars evenly across perspectives, cap total
+            per_perspective_chars = _MAX_COMBINED_CHARS // max(len(solutions), 1)
+            capped_solutions = {
+                name: _truncate_text(sol, per_perspective_chars, f"{name} solution (for review)")
+                for name, sol in solutions.items()
+            }
             review = self._llm.complete(
                 prompt=f"""Review these solution proposals.
 
 Original task: {question}
 
 Proposed solutions:
-{self._format_solutions(solutions)}
+{self._format_solutions(capped_solutions)}
 
 For each solution, provide:
 1. Strengths (what's done well)
@@ -576,9 +603,11 @@ Respond with JSON only:
                     if agent_feedback.get("refinement_needed"):
                         log.step(f"{p_name}  Refining solution...")
 
+                        # Cap solution text so agent.query() doesn't exceed token limit
+                        capped_sol = _truncate_text(solution, _MAX_SECTION_CHARS, f"{p_name} solution (for refinement)")
                         refinement_prompt = f"""Your previous solution proposal:
 
-{solution}
+{capped_sol}
 
 LEAD feedback:
 
@@ -618,8 +647,15 @@ Provide refined solution addressing all feedback points."""
                 with ThreadPoolExecutor(max_workers=len(configs_needing_work)) as pool:
                     futures = {pool.submit(_refine_one, pc): pc for pc in configs_needing_work}
                     for fut in as_completed(futures):
-                        p_name, refined = fut.result()
-                        refined_solutions[p_name] = refined
+                        try:
+                            p_name, refined = fut.result()
+                            refined_solutions[p_name] = refined
+                        except Exception as e:
+                            # Timeout or API error — carry forward the previous solution
+                            pc = futures[fut]
+                            p_name = pc["name"]
+                            log.warn(f"{p_name}  Refinement failed ({type(e).__name__}), using previous solution")
+                            refined_solutions[p_name] = solutions.get(p_name, "")
 
             solutions = refined_solutions
             iteration += 1
@@ -637,7 +673,13 @@ Provide refined solution addressing all feedback points."""
         convergence_meta: dict,
     ) -> tuple[str, dict]:
         """Final synthesis of perspective-based solutions."""
-        solutions_text = self._format_solutions(solutions)
+        # Cap solutions so the synthesis prompt stays under the token limit
+        per_perspective_chars = _MAX_COMBINED_CHARS // max(len(solutions), 1)
+        capped = {
+            name: _truncate_text(sol, per_perspective_chars, f"{name} solution (for synthesis)")
+            for name, sol in solutions.items()
+        }
+        solutions_text = self._format_solutions(capped)
         iterations = convergence_meta.get("convergence_iterations", 0)
         converged = convergence_meta.get("converged", False)
 
@@ -660,8 +702,16 @@ Provide:
 
 Be transparent about the multi-perspective process and how it informed the final solution."""
 
-        result = self.lead._llm.complete(prompt=prompt, max_tokens=32768)
-        final = self.lead._continue_if_truncated(prompt, result)
+        try:
+            result = self.lead._llm.complete(prompt=prompt, max_tokens=32768)
+            final = self.lead._continue_if_truncated(prompt, result)
+        except Exception as e:
+            # Final synthesis timed out — concatenate solutions with headers as fallback
+            log.warn(f"Synthesis failed ({type(e).__name__}), returning concatenated perspectives")
+            parts = []
+            for name, sol in solutions.items():
+                parts.append(f"## Perspective: {name}\n\n{sol}")
+            final = "\n\n---\n\n".join(parts)
 
         log.ok(f"Synthesis complete")
 
@@ -806,6 +856,11 @@ class CrossPollinationEngine:
         own_name: str,
     ) -> str:
         """Build the prompt an agent sees after receiving its counterpart's output."""
+        # Cap each output so the combined prompt fits under the token limit
+        # (the receiving agent also has its own file-based system prompt)
+        half_budget = _MAX_SECTION_CHARS
+        own_output = _truncate_text(own_output, half_budget, f"{own_name} output (refine)")
+        counterpart_output = _truncate_text(counterpart_output, half_budget, f"{counterpart_name} output (refine)")
         return f"""## Original Question
 
 {original_question}
@@ -843,6 +898,14 @@ refined answer."""
         name_b: str,
     ) -> str:
         """Coordinator reconciles the two refined outputs into a final answer."""
+        # Truncate extremely large outputs to prevent prompt from exceeding
+        # what the API can process within the timeout window.
+        max_output_chars = 80_000
+        if len(output_a) > max_output_chars:
+            output_a = output_a[:max_output_chars] + f"\n\n[... truncated from {len(output_a):,} chars ...]"
+        if len(output_b) > max_output_chars:
+            output_b = output_b[:max_output_chars] + f"\n\n[... truncated from {len(output_b):,} chars ...]"
+
         prompt = f"""## Reconciliation Task
 
 Two agents independently processed the same question, exchanged outputs, and
@@ -871,21 +934,31 @@ Synthesize a unified response that:
 
 Be transparent about which agent contributed which insights."""
 
-        result = self._llm.complete(prompt=prompt, max_tokens=32768)
+        try:
+            result = self._llm.complete(prompt=prompt, max_tokens=32768)
+        except Exception as e:
+            # API timeout or error during reconciliation — fall back to the
+            # longer (presumably more complete) agent output rather than crash.
+            log.warn(f"Reconciliation failed ({type(e).__name__}), using longer agent output as fallback")
+            return output_a if len(output_a) >= len(output_b) else output_b
 
         # Handle truncation
         parts = [str(result)]
         for _ in range(3):
             if not getattr(result, "truncated", False):
                 break
-            result = self._llm.complete(
-                prompt=(
-                    "Continue EXACTLY where this left off. Do not repeat.\n\n"
-                    f"--- PARTIAL ---\n{parts[-1][-2000:]}\n--- END ---\n\nContinue:"
-                ),
-                max_tokens=32768,
-            )
-            parts.append(str(result))
+            try:
+                result = self._llm.complete(
+                    prompt=(
+                        "Continue EXACTLY where this left off. Do not repeat.\n\n"
+                        f"--- PARTIAL ---\n{parts[-1][-2000:]}\n--- END ---\n\nContinue:"
+                    ),
+                    max_tokens=32768,
+                )
+                parts.append(str(result))
+            except Exception:
+                log.warn("Continuation request failed, returning partial result")
+                break
 
         return "\n".join(parts)
 

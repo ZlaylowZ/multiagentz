@@ -14,6 +14,12 @@ from typing import Any, Optional
 
 from multiagentz.llm_config import llm_config, _infer_provider_from_model
 
+# ── Token budget constants ─────────────────────────────────────────────
+# Conservative estimate: ~3.5 chars per token for mixed English/code.
+# Used for pre-flight prompt size validation to avoid 400 errors.
+CHARS_PER_TOKEN_ESTIMATE: float = 3.5
+MAX_INPUT_TOKENS: int = 195_000  # Safe margin below Anthropic's 200K limit
+
 
 def _get_raw_client(
     provider: str,
@@ -131,7 +137,7 @@ class LLMClient:
             self._api_key = llm_config.get_api_key_for_provider(self._provider)
         
         self._base_url = llm_config.get_base_url_for_provider(self._provider)
-        
+
         # Validate before constructing SDK client
         if not self._api_key:
             from multiagentz.llm_config import _is_key_configured
@@ -166,6 +172,57 @@ class LLMClient:
         """Escape hatch for tool-calling code that needs the native client."""
         return self._client
 
+    @staticmethod
+    def estimate_tokens(text: str) -> int:
+        """Rough token count estimate (conservative — may slightly overcount)."""
+        return int(len(text) / CHARS_PER_TOKEN_ESTIMATE)
+
+    def _guard_prompt_size(
+        self, prompt: str, system: Optional[str]
+    ) -> tuple[str, Optional[str]]:
+        """
+        Pre-flight check: truncate prompt/system if estimated tokens exceed API limit.
+
+        Preserves system prompt (essential instructions) and truncates user prompt
+        first.  If system itself is too large, truncates that too.
+        """
+        est_prompt = self.estimate_tokens(prompt)
+        est_system = self.estimate_tokens(system) if system else 0
+        est_total = est_prompt + est_system
+
+        if est_total <= MAX_INPUT_TOKENS:
+            return prompt, system
+
+        from multiagentz import log
+        log.warn(
+            f"Prompt too large (~{est_total:,} est. tokens, "
+            f"limit {MAX_INPUT_TOKENS:,}). Auto-truncating to fit."
+        )
+
+        # Try truncating user prompt first (system has essential instructions)
+        headroom = 1_000  # tokens
+        available_for_prompt = MAX_INPUT_TOKENS - est_system - headroom
+
+        if available_for_prompt < 10_000:
+            # System prompt itself is enormous — truncate it too
+            max_sys_chars = int((MAX_INPUT_TOKENS - 50_000) * CHARS_PER_TOKEN_ESTIMATE)
+            if system:
+                system = (
+                    system[:max_sys_chars]
+                    + "\n\n[... system prompt truncated to fit token limit ...]"
+                )
+            available_for_prompt = 50_000
+
+        max_prompt_chars = int(available_for_prompt * CHARS_PER_TOKEN_ESTIMATE)
+        if len(prompt) > max_prompt_chars:
+            prompt = (
+                prompt[:max_prompt_chars]
+                + f"\n\n[... prompt truncated from {len(prompt):,} chars "
+                f"to fit {MAX_INPUT_TOKENS:,} token limit ...]"
+            )
+
+        return prompt, system
+
     def complete(
         self,
         prompt: str,
@@ -174,15 +231,18 @@ class LLMClient:
     ) -> CompletionResult:
         """
         Generate completion from prompt.
-        
+
         Args:
             prompt: User prompt
             system: System prompt (optional)
             max_tokens: Maximum tokens to generate
-            
+
         Returns:
             CompletionResult with text and metadata
         """
+        # Pre-flight: prevent 400 errors from oversized prompts
+        prompt, system = self._guard_prompt_size(prompt, system)
+
         if self._provider == "anthropic":
             return self._complete_anthropic(prompt, system, max_tokens)
         else:

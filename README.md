@@ -195,6 +195,22 @@ Multi-perspective analysis: independent solutions, LEAD review, iterative refine
 ### Cross-Pollination
 A/B twin agents (different models) exchange outputs and refine. Produces cognitively diverse results.
 
+## Token Limits and Prompt Budgeting
+
+LLM APIs enforce hard input token limits (e.g. Anthropic: 200K tokens). In complex orchestration modes (perspective, cross-pollination), prompts can grow very large as Q&A context, solution text, and file contents accumulate across phases.
+
+**multiagentz handles this automatically:**
+
+- **`LLMClient` safety net** — Every API call runs a pre-flight token estimate. If the prompt + system prompt would exceed 195K tokens, the prompt is automatically truncated with a warning log. This prevents `400 prompt is too long` errors that would otherwise crash the run.
+- **Orchestration-level guards** — Smart truncation is applied at each accumulation point: Q&A bootstrap history, solution generation context, LEAD review payloads, refinement prompts, synthesis inputs, and cross-pollination swap rounds. Each section is budgeted independently so no single section can starve the others.
+- **Timeout resilience** — If an API call times out during refinement, reconciliation, or synthesis, the framework gracefully degrades (carries forward the previous solution, falls back to the longer output, or concatenates perspectives) instead of crashing.
+
+**If you see truncation warnings in logs**, your prompts are hitting the budget. To reduce prompt size:
+- Use smaller `key_files` lists (load only essential files, not entire repos)
+- Reduce `max_iterations` in orchestration config
+- Use shorter system prompts
+- Split large tasks into focused sub-questions
+
 ## REPL Commands
 
 | Command | Description |

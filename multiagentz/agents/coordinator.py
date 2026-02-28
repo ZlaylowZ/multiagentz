@@ -164,8 +164,17 @@ Sub-agents:
     # ── Synthesis ───────────────────────────────────────────────────────
 
     def _synthesize(self, question: str, responses: dict[str, str]) -> str:
+        # Cap each response so concatenation doesn't blow the token limit
+        max_per_resp = 300_000 // max(len(responses), 1)
+        capped = {}
+        for agent, resp in responses.items():
+            if len(resp) > max_per_resp:
+                _log.warn(f"Truncating {agent} response from {len(resp):,} to {max_per_resp:,} chars for synthesis")
+                resp = resp[:max_per_resp] + f"\n\n[... truncated from {len(resp):,} chars ...]"
+            capped[agent] = resp
+
         responses_text = "\n\n".join(
-            f"=== {agent} ===\n{resp}" for agent, resp in responses.items()
+            f"=== {agent} ===\n{resp}" for agent, resp in capped.items()
         )
         prompt = f"""Synthesize these responses into a unified answer.
 
