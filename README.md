@@ -139,7 +139,7 @@ PROVIDERS = {
 }
 ```
 
-You only need **one** provider to get started. For cross-pollination (twin agents), you need at least **two**.
+You only need **one** provider to get started. For cross-pollination (twin agents), use the same model (e.g., TwinA_claude-opus, TwinB_claude-opus) or use different providers and models.
 
 ### YAML Stack Reference
 
