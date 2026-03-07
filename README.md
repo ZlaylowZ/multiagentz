@@ -46,7 +46,7 @@ maz --config stacks/example.yaml
 - **Multi-provider support** — Anthropic, OpenAI, xAI (Grok), Google (Gemini)
 - **Per-agent models** — Use different AI models for different agents
 - **Cost optimization** — Expensive models for complex routing, cheap models for simple lookups
-- **Orchestration modes** — Standard, consensus, and perspective-based analysis
+- **Orchestration modes** — Standard, consensus, perspective-based analysis, and builder mode
 - **Cross-pollination** — A/B twin agents using different models for cognitive diversity
 - **Auto provider detection** — Model name determines provider automatically
 
@@ -106,6 +106,9 @@ LeadAgent (classify -> route -> query -> synthesize -> cache)
 | **CoordinatorAgent** | Routes to child agents, queries in parallel, synthesizes. Nestable. |
 | **LeadAgent** | Top-level orchestrator: keyword hints + LLM routing + parallel query + synthesis + cache. |
 | **FileHandlerAgent** | Watches arbitrary files/directories. Persistent watch list. |
+| **ArchitectAgent** | Decomposes tasks into dependency-ordered DAG plans. Validates structure, detects cycles, replans on failure. |
+| **BuilderAgent** | Executes scoped coding tasks. Write-validate-fix loop with structured JSON output. Composes SubAgent for file context. |
+| **TaskDAG** | Walks dependency graph, spawns BuilderAgents in parallel, handles failure with Architect-mediated replanning. |
 | **LLMClient** | Unified multi-provider client (Anthropic, OpenAI, xAI, Google). |
 
 ## Supported LLM Providers
@@ -147,7 +150,7 @@ You only need **one** provider to get started. For cross-pollination (twin agent
 name: stack-name
 
 orchestration:
-  mode: standard          # standard | consensus | perspective
+  mode: standard          # standard | consensus | perspective | builder
   max_iterations: 3       # Refinement cycles
   cross_pollination: false # A/B twin agent loops
 
@@ -194,6 +197,47 @@ Multi-perspective analysis: independent solutions, LEAD review, iterative refine
 
 ### Cross-Pollination
 A/B twin agents (different models) exchange outputs and refine. Produces cognitively diverse results.
+
+### Builder
+
+Plan-act-validate loop. Shifts from read-only analysis to code generation.
+
+The **ArchitectAgent** decomposes a task into a dependency-ordered DAG. **BuilderAgents** execute each subtask — writing files, running shell commands, and validating results. Independent tasks run in parallel. Failures trigger automatic replanning via the Architect.
+
+**How it works:**
+1. **Architect plans** — decomposes your task into dependency-ordered subtasks with validation commands
+2. **You approve** — plan displayed in terminal, confirm with `y`, edit with `e` (opens `$EDITOR`), or cancel with `N`
+3. **Builders execute** — parallel execution with write-validate-fix loops, automatic retry on failure
+
+**Stack configuration:**
+
+```yaml
+name: my-project-builder
+
+orchestration:
+  mode: builder
+  max_iterations: 3
+
+architect:
+  model: claude-opus-4-6             # Quality planning
+
+builder_defaults:
+  model: claude-sonnet-4-20250514    # Fast implementation
+  max_retries: 3
+  max_tokens: 16384
+  validation_commands:
+    - "python -m py_compile {file}"
+    - "ruff check {file} --select E,F"
+
+workspace: /path/to/your/project
+```
+
+**Usage:**
+
+```
+maz --config stacks/my-builder.yaml
+> /build Add user authentication with JWT tokens
+```
 
 ## Performance Tuning
 
@@ -343,6 +387,7 @@ The underlying HTTP timeout is configured in `llm_client.py` (default: 600s with
 | `/export [html\|md\|txt]` | Export last response |
 | `/perspective "<q>"` | Multi-perspective analysis |
 | `/consensus <q>` | Force consensus mode |
+| `/build <task>` | Execute a coding task via Architect → Builder pipeline |
 | `/promote <agent>` | Promote to LEAD_SUB |
 | `/status` | Show orchestration status |
 
@@ -354,6 +399,7 @@ The underlying HTTP timeout is configured in `llm_client.py` (default: 600s with
 | `stacks/advanced_example.yaml` | Multi-provider with cross-pollination |
 | `stacks/template.yaml` | Full reference with all options |
 | `stacks/minimal.yaml` | Bare minimum starter |
+| `stacks/builder_test.yaml` | Builder mode with validation |
 
 ## Features
 **Built for Claude Code** — Run deep multi-agent analysis, get an auto-exported HTML artifact, and hand it directly to Claude Code for implementation. The hard thinking happens here; the building happens​​​​​​​​​​​​​​​​

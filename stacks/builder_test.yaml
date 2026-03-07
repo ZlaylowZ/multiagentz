@@ -1,0 +1,17 @@
+name: builder-test
+
+orchestration:
+  mode: builder
+  max_iterations: 2
+
+architect:
+  model: claude-sonnet-4-20250514
+
+builder_defaults:
+  model: claude-sonnet-4-20250514
+  max_retries: 3
+  max_tokens: 16384
+  validation_commands:
+    - "python -m py_compile {file}"
+
+workspace: /tmp/maz-builder-test
