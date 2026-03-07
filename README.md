@@ -6,7 +6,7 @@ Multi-agent orchestration framework. Define domain-expert AI agent teams in YAML
 
 You describe your agent hierarchy in a YAML file — which code repositories each agent knows about, what models they use, how they're grouped — and `multiagentz` builds the full system: intelligent routing, parallel queries, response synthesis, caching, and a terminal interface.
 
-**One YAML file is the entire interface.** No Python coding required.
+**One YAML file is the entire interface.** Practically no Python coding required.
 
 ## Quick Start
 
