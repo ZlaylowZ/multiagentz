@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "multiagentz": {
+      "type": "url",
+      "url": "https://multiagentz-mcp-HASH.a.run.app/mcp",
+      "note": "Replace HASH with your Cloud Run service hash after deployment. See README for setup instructions."
+    }
+  }
+}

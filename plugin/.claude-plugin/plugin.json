@@ -1,0 +1,20 @@
+{
+  "name": "multiagentz",
+  "version": "0.3.0",
+  "description": "Multi-agent orchestration plugin — run cross-pollination, consensus, and perspective analysis across multiple LLM providers from Claude Code",
+  "author": {
+    "name": "ZlaylowZ",
+    "url": "https://github.com/ZlaylowZ"
+  },
+  "repository": "https://github.com/ZlaylowZ/multiagentz",
+  "license": "MIT",
+  "keywords": [
+    "multi-agent",
+    "orchestration",
+    "cross-pollination",
+    "consensus",
+    "perspective",
+    "multi-llm",
+    "mcp"
+  ]
+}
