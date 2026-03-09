@@ -84,6 +84,7 @@ class LeadAgent:
         self.orchestration_config = orchestration_config or {}
         self._orchestration_engine = None  # Lazy init
         self._lead_sub_manager = None  # Lazy init
+        self._builder_orchestration_engine = None  # Lazy init
         self._last_successful_route: Optional[list[str]] = None  # Cache for fallback
 
         _log.lead(self.name, f"Agents: {', '.join(self.agents.keys())}")
@@ -107,6 +108,31 @@ class LeadAgent:
             from multiagentz.orchestration import LEADSUBPromotion
             self._lead_sub_manager = LEADSUBPromotion(self)
         return self._lead_sub_manager
+
+    @property
+    def builder_orchestration(self):
+        """Lazy-load builder orchestration engine."""
+        if self._builder_orchestration_engine is None:
+            from multiagentz.orchestration import BuilderOrchestrationEngine
+            self._builder_orchestration_engine = BuilderOrchestrationEngine(self)
+        return self._builder_orchestration_engine
+
+    def query_build(self, task: str) -> tuple[str, dict]:
+        """
+        Execute a builder task.
+
+        Returns (summary, metadata).
+        """
+        workspace = self.orchestration_config.get("workspace", ".")
+        architect_config = self.orchestration_config.get("architect_config", {})
+        builder_defaults = self.orchestration_config.get("builder_defaults", {})
+
+        return self.builder_orchestration.execute_build(
+            task=task,
+            workspace_path=workspace,
+            architect_config=architect_config,
+            builder_defaults=builder_defaults,
+        )
 
     # ── Pre-route heuristic ────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 Stack loader — builds an agent hierarchy from a declarative YAML config.
 
 Now supports orchestration configuration AND per-agent model specification:
-- mode: standard | consensus | perspective
+- mode: standard | consensus | perspective | builder
 - perspective agent definitions
 - max_iterations for refinement cycles
 - Per-agent model/provider overrides via YAML
@@ -74,7 +74,7 @@ def load_stack(config_path: str) -> LeadAgent:
     cross_pollination = orchestration_config.get("cross_pollination", False)
 
     # Validate mode
-    if orchestration_mode not in ("standard", "consensus", "perspective"):
+    if orchestration_mode not in ("standard", "consensus", "perspective", "builder"):
         print(f"Warning: Unknown orchestration mode '{orchestration_mode}', defaulting to 'standard'")
         orchestration_mode = "standard"
 
@@ -98,6 +98,16 @@ def load_stack(config_path: str) -> LeadAgent:
         "cross_pollination": cross_pollination,
         "twin_map": twin_map,
     }
+
+    # Builder mode: extract workspace and builder config
+    if orchestration_mode == "builder":
+        workspace = config.get("workspace", ".")
+        architect_config = config.get("architect", {})
+        builder_defaults = config.get("builder_defaults", {})
+        orch_settings["workspace"] = str(Path(workspace).resolve())
+        orch_settings["architect_config"] = architect_config
+        orch_settings["builder_defaults"] = builder_defaults
+        orch_settings["builder_overrides"] = config.get("builder_overrides", {})
 
     # Create custom LLMClient for LeadAgent if specified
     lead_llm_client = _create_llm_client_from_spec(lead_config)
@@ -161,6 +171,30 @@ def _build_agents(
                 max_workers=spec.get("max_workers", 8),
                 llm_client=llm_client,
                 twin_map=child_twins if cross_pollination else {},
+            )
+
+        elif agent_type == "builder":
+            from multiagentz.agents.builder import BuilderAgent
+            agents[name] = BuilderAgent(
+                name=name,
+                workspace_path=spec.get("workspace_path", spec.get("repo_path", ".")),
+                relevant_files=spec.get("key_files", []),
+                validation_commands=spec.get("validation_commands", []),
+                max_retries=spec.get("max_retries", 3),
+                max_tokens=spec.get("max_tokens", 16384),
+                command_timeout=spec.get("command_timeout", 60),
+                llm_client=llm_client,
+            )
+
+        elif agent_type == "service":
+            from multiagentz.agents.service import ServiceAgent
+            agents[name] = ServiceAgent(
+                name=name,
+                base_url=spec.get("base_url", "http://localhost:8080"),
+                description=spec.get("description", ""),
+                endpoint=spec.get("endpoint", "/v1/chat"),
+                instance_id=spec.get("instance_id"),
+                timeout=spec.get("timeout", 120),
             )
 
         elif agent_type == "files":

@@ -105,8 +105,8 @@ Here's what needs to happen:
 2. Create a Python virtual environment and install the package with: pip install -e ".[all]"
 3. Ask me which AI providers I want to use (Anthropic, OpenAI, xAI, Google)
 4. For each provider I choose, ask me to paste my API key
-5. Update the file multiagentz/providers.py with my actual keys
-   (replace the "YOUR_..._HERE" placeholders with the real keys I give you)
+5. Create a .env file in the project root with my API keys
+   (e.g. ANTHROPIC_API_KEY=sk-ant-...)
 6. Test that the installation works by running: python -c "from multiagentz.llm_config import llm_config; llm_config.validate(); print('OK:', llm_config.llm_provider, llm_config.llm_model)"
 7. Explain what a "stack" YAML config does (briefly), then help me create one for
    my project by asking about my code/project directories
@@ -204,8 +204,8 @@ of figuring everything out from scratch.
 | `command not found: python3` | Run: `brew install python@3.12` |
 | `command not found: brew` | See Step 1c above |
 | `command not found: maz` | Make sure you activated the venv: `source .venv/bin/activate` |
-| `No API keys configured` | Edit `multiagentz/providers.py` and paste your keys (see Step 3) |
-| `No API key for provider` | You specified a model in YAML for a provider you haven't configured in providers.py |
+| `No API keys configured` | Add your API key to `.env` (e.g. `ANTHROPIC_API_KEY=sk-ant-...`) |
+| `No API key for provider` | Set the matching `{PROVIDER}_API_KEY` in your `.env` file |
 | `ModuleNotFoundError` | Re-run: `pip install -e ".[all]"` |
 | Anything else | Paste the error into Claude Code — it'll figure it out |
 

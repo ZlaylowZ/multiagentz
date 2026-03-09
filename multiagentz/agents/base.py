@@ -55,9 +55,9 @@ class SubAgent:
     Can be instantiated directly from config (no subclassing needed):
 
         agent = SubAgent(
-            name="backend",
+            name="sdk",
             repo_path="/path/to/repo",
-            description="Expert on the backend API.",
+            description="Expert on the PyLocker SDK.",
             system_prompt="You are an expert on ...",
             key_files=["src/", "README.md"],
         )

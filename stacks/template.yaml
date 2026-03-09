@@ -1,127 +1,216 @@
-# stacks/template.yaml
-# ──────────────────────────────────────────────────────────────────────
-# Full reference template with all options documented.
-# Copy this file and customize for your project.
-#
-# Usage:
-#   maz --config stacks/my-stack.yaml
-# ──────────────────────────────────────────────────────────────────────
-
-name: my-project
-
-# ── Orchestration (optional) ───────────────────────────────────────
-# orchestration:
-#   mode: standard              # Options: standard | consensus | perspective
-#   max_iterations: 3           # Refinement cycles (consensus/perspective)
-#   cross_pollination: false    # Enable A/B twin agent loops
-
-# ── Lead Agent Configuration ──────────────────────────────────────
+# yaml-language-server: $schema=
+name: nukez-optimized
+# LeadAgent uses Opus for complex orchestration
 lead:
-  # model: claude-sonnet-4-20250514   # Optional: model for routing decisions
-
+  model: claude-opus-4-20250514  # Expensive but smart for routing
+  
   routing_prompt_extra: |
-    Describe your project here. This helps the router
-    make better decisions about which agent to query.
+    Nukez is cryptographic storage infrastructure for autonomous AI agents,
+    enabling agents to autonomously pay for storage using Solana blockchain,
+    receive cryptographic receipts, and reason about verifiable memory through
+    attestation pipelines.
 
-    Example:
-    This is a web application with a Python API backend
-    and a React frontend. Questions about endpoints,
-    database, or server logic go to the backend agent.
-    Questions about UI, components, or hooks go to frontend.
+    **Core Components:**
+    - **Nukez Backend** — FastAPI gateway with attestation, receipts, Solana anchoring
+    - **PyLocker SDK** — Production Python client library for agent integration
+    - **PTK** — INTERNAL SDK test suite
+    - **Frontend** — React application with x402 payment protocol integration
 
+    ## Routing Rules
+
+    - "How do I use Nukez?" → sdk (production interface)
+    - "How does attestation work?" → backend (implementation details)
+    - "Payment integration?" → sdk + backend
+    - "Test infrastructure?" → ptk (internal only)
+    - SDK vs PTK: default to sdk unless explicitly about test runners
+  
   keywords:
+    sdk:
+      - pylocker
+      - sdk
+      - client
+      - tool definitions
+      - agent instructions
+      - quickstart
+      - integration
+    ptk:
+      - ptk
+      - test runner
+      - test suite
+      - test infrastructure
     backend:
-      - api
-      - endpoint
-      - database
-      - server
-      - model
-      - migration
+      - attestation
+      - receipt
+      - solana
+      - switchboard
+      - oracle
+      - merkle
+      - ed25519
+      - pricing
+      - storage provider
+      - mongodb
+      - gcs
     frontend:
       - react
-      - component
-      - page
-      - hook
-      - css
+      - firebase
+      - x402
+      - payment protocol
       - ui
-
+      - component
+  
   agents:
-    # ── Simple Sub-Agent ─────────────────────────────────────────
-    backend:
-      repo_path: /path/to/your/backend
+    # ── SDK Agent ─────────────────────────────────────────────────────
+    sdk:
+      repo_path: /Users/zhanson/pylocker
       description: >
-        Backend API — endpoints, database models, authentication,
-        business logic.
+        Expert on the PyLocker SDK — the PRODUCTION client library for Nukez.
+        Covers client methods, auth, payments, file ops, tool definitions,
+        agent integration, and usage examples.
       system_prompt: |
-        You are an expert on the backend service.
-        Answer questions grounded in the actual source code.
-      # model: claude-sonnet-4-20250514  # Optional: per-agent model
+        You are an expert on the PyLocker SDK — the official production
+        interface for Nukez cryptographic storage.
+
+        Topics you cover:
+        - SDK client methods and usage patterns
+        - Authentication (signed envelopes, wallet integration)
+        - Payment flows and x402 protocol
+        - File operations (upload, download, list, delete)
+        - Tool definitions for LLM/agent integration
+        - Error handling and retry patterns
+        - Integration examples (Anthropic, OpenAI, MCP)
+
+        Ground all responses in the actual SDK source code and documentation.
       key_files:
-        - src/
+        - pylocker/__init__.py
+        - pylocker/client.py
+        - pylocker/auth.py
+        - pylocker/payment.py
+        - pylocker/errors.py
+        - pylocker/types.py
+        - pylocker/discovery.py
         - README.md
-      # max_tokens: 32768          # Optional (default: 32768)
-      # max_context_chars: 600000  # Optional (default: 600,000)
+        - docs/
+        - examples/
 
-    # ── Another Sub-Agent ────────────────────────────────────────
-    frontend:
-      repo_path: /path/to/your/frontend
+    # ── PTK Agent ─────────────────────────────────────────────────────
+    ptk:
+      repo_path: /Users/zhanson/ptk
       description: >
-        React frontend — components, hooks, styling, routing.
+        Expert on PTK (PyLocker Test Kit) — INTERNAL test infrastructure.
+        Covers test runners, fixtures, validation, report generation.
       system_prompt: |
-        You are an expert on the frontend application.
-      # model: gemini-2.0-flash    # Optional: use a different/cheaper model
+        You are an expert on PTK (PyLocker Test Kit), the INTERNAL test
+        and validation infrastructure for Nukez.
+
+        Your scope is the TEST INFRASTRUCTURE ITSELF — runners, harnesses,
+        validation logic, and how tests are structured.
+
+        If a question is about SDK usage, note that it belongs to the SDK agent.
       key_files:
-        - src/
-        - package.json
+        - ptk/test_runner.py
+        - ptk/agent_executor.py
+        - ptk/test_sdk_integration.py
+        - ptk/test_contract_validation.py
+        - README.md
 
-    # ── Coordinator (groups child agents) ────────────────────────
-    # infrastructure:
+    # ── Backend (sub-coordinator) ─────────────────────────────────────
+    backend:
+      type: coordinator
+      description: >
+        Coordinator for Nukez backend — routes to core, docs, and frontend.
+      routing_prompt_extra: |
+        - **core**: Business logic (attestation, crypto, payments, storage, receipts)
+        - **docs**: Documentation, OpenAPI specs, agent briefings
+        - **frontend**: React UI, Firebase deployment, x402 integration
+      agents:
+        core:
+          repo_path: /Users/zhanson/Desktop/DataLocker
+          description: >
+            Core business logic: attestation, cryptography, payments,
+            pricing, storage, receipts, wallets, Solana integration.
+          system_prompt: |
+            You are an expert on Nukez's core business logic.
+            
+            Topics: attestation pipelines, merkle tree generation,
+            Ed25519 signatures, Solana on-chain anchoring, Switchboard
+            oracle integration, pricing modules, storage provider
+            abstraction, MongoDB integration, receipt generation,
+            wallet management, security, rate limiting.
+
+            Key architectural principles:
+            - Agents care about traceability, receipt binding, state invariance
+            - Agents reason about verifiable memory through cryptographic proofs
+            - All storage operations return cryptographically verifiable receipts
+          key_files:
+            - gateway/app/core/
+
+        docs:
+          repo_path: /Users/zhanson/Desktop/DataLocker
+          description: >
+            Documentation: API specs, agent briefings, auth docs, schemas.
+            AUTHORITATIVE SOURCE for API capabilities.
+          system_prompt: |
+            You are an expert on Nukez documentation and the
+            AUTHORITATIVE SOURCE for API capabilities.
+            
+            Topics: API documentation, OpenAPI specs, agent briefings,
+            authentication documentation, error recovery, tool contracts,
+            MCP configurations, discovery schemas.
+          key_files:
+            - unified_docs/docs/AGENT_BRIEFING.md
+            - unified_docs/docs/AUTH_SIGNED_ENVELOPE.md
+            - unified_docs/docs/ERROR_RECOVERY.md
+            - unified_docs/v1/openapi.json
+            - unified_docs/v1/tools.json
+            - unified_docs/.well-known/datalocker.json
+
+        frontend:
+          repo_path: /Users/zhanson/datalocker-frontend
+          description: >
+            React frontend with x402 payment protocol integration.
+          system_prompt: |
+            You are an expert on the Nukez frontend — a React application
+            hosted on Firebase with x402 payment protocol integration.
+            
+            Topics: component hierarchy, routing, state management,
+            API integration, x402 payment flow, Firebase deployment,
+            neon cyberpunk aesthetics.
+          key_files:
+            - src/
+            - public/
+            - firebase.json
+            - package.json
+            - README.md
+
+    # ────────────────────────────────────────────────────────
+    # ADD MORE AGENTS BY COPYING THIS SECTION:
+    # ────────────────────────────────────────────────────────
+    # agent3:
+    #   repo_path: /path/to/code
+    #   description: What this agent knows
+    #   model: claude-haiku-3-5-20241022  # Optional: override model
+    #   key_files:
+    #     - src/
+    
+    # ────────────────────────────────────────────────────────
+    # ADD COORDINATOR BY COPYING THIS SECTION:
+    # ────────────────────────────────────────────────────────
+    # coordinator_name:
     #   type: coordinator
-    #   description: >
-    #     Groups infrastructure-related agents under one coordinator.
-    #   routing_prompt_extra: |
-    #     - **devops**: CI/CD, Docker, deployment
-    #     - **database**: Schema, migrations, queries
+    #   description: Groups related agents
     #   agents:
-    #     devops:
-    #       repo_path: /path/to/infra
-    #       description: CI/CD and deployment expert
-    #       key_files: [Dockerfile, .github/workflows/]
-    #     database:
-    #       repo_path: /path/to/db
-    #       description: Database schema and migration expert
-    #       key_files: [migrations/, schema.sql]
-
-    # ── Twin Agents (cross-pollination) ──────────────────────────
-    # Requires: orchestration.cross_pollination: true
-    #
-    # twin_group:
-    #   type: coordinator
-    #   description: A/B twin pair for diverse perspectives
-    #   agents:
-    #     AgentA:
-    #       repo_path: /path/to/code
-    #       model: claude-sonnet-4-20250514
-    #       description: Primary expert
+    #     child1:
+    #       repo_path: /path
     #       key_files: [src/]
-    #       twin: AgentB
-    #     AgentB:
-    #       repo_path: /path/to/code
-    #       model: grok-4-1-fast-non-reasoning
-    #       description: Secondary expert (different model)
-    #       key_files: [src/]
-    #       twin: AgentA
-
-# ── Optional Settings ─────────────────────────────────────────────
-# disable_files_agent: false    # Set true to exclude FileHandlerAgent
-# cache_ttl_hours: 72           # Default cache TTL in hours
-
-# ═══════════════════════════════════════════════════════════════════
-# Quick Start:
-# 1. Copy this file: cp stacks/template.yaml stacks/my-stack.yaml
+    #     child2:
+    #       repo_path: /path
+    #       key_files: [lib/]
+# ============================================================
+# Next Steps:
+# 1. Update agent names (agent1, agent2 → meaningful names)
 # 2. Update repo_path for each agent
-# 3. Update key_files to point to your important source files
-# 4. Customize descriptions and system prompts
-# 5. Add your API keys to multiagentz/providers.py
+# 3. Update key_files for each agent
+# 4. Add keywords for better routing
+# 5. Set environment variables (see .env.example)
 # 6. Run: maz --config stacks/my-stack.yaml
-# ═══════════════════════════════════════════════════════════════════
+# ============================================================

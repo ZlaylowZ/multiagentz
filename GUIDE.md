@@ -134,47 +134,6 @@ The perspective pipeline:
 4. **Iterative refinement** — agents refine based on lead feedback (runs in parallel)
 5. **Consensus synthesis** — final unified answer combining the best of all perspectives
 
-### Level 6: Builder mode (code generation)
-
-**Use when:** You want maz to *write code*, not just analyze it. The Architect decomposes your task into a dependency-ordered plan, BuilderAgents execute each subtask with validation gates, and failures trigger automatic replanning.
-
-Builder mode is for implementation tasks — scaffolding a new feature, writing tests, generating boilerplate. For design and analysis, use perspective mode instead.
-
-```yaml
-name: my-project-builder
-
-orchestration:
-  mode: builder
-  max_iterations: 3
-
-architect:
-  model: claude-opus-4-6
-
-builder_defaults:
-  model: claude-sonnet-4-20250514
-  max_retries: 3
-  max_tokens: 16384
-  validation_commands:
-    - "python -m py_compile {file}"
-
-workspace: /path/to/your/project
-```
-
-From the REPL:
-```
-You: /build Add input validation to the REST API endpoints
-```
-
-The Architect produces a plan, you review it (and optionally edit it in `$EDITOR`), then BuilderAgents execute in parallel with validation. Each builder writes files, runs validation commands, and retries on failure.
-
-**Builder vs Perspective — when to use which:**
-
-| Goal | Mode | Why |
-|------|------|-----|
-| Analyze architecture, plan a migration | Perspective | Multiple independent proposals, lead review, consensus synthesis |
-| Write code, scaffold features, generate tests | Builder | Plan → act → validate → iterate loop with file output |
-| Deep analysis *then* implementation | Both | Perspective first for the plan, builder to execute it |
-
 ---
 
 ## The maz → Claude Code Workflow
@@ -233,23 +192,6 @@ Follow the implementation plan in the analysis.
 
 Claude Code now has a high-confidence blueprint to work from instead of figuring everything out from scratch.
 
-### The Full Loop: Analysis → Build → Polish
-
-With builder mode, the handoff is now bidirectional:
-
-1. **Perspective mode** for deep analysis — architecture review, design decisions, trade-off analysis
-2. **Builder mode** to scaffold the implementation — `/build` writes the code with validation
-3. **Claude Code** for polish — debugging, edge cases, integration testing
-
-Or skip straight to builder mode if you already know what to build:
-
-```
-maz --config stacks/my-builder.yaml
-> /build Add rate limiting middleware with Redis backend
-```
-
-The Architect plans it, you approve, BuilderAgents write the code. Hand the result to Claude Code for refinement if needed.
-
 ---
 
 ## REPL Commands Reference
@@ -276,7 +218,6 @@ The Architect plans it, you approve, BuilderAgents write the code. Hand the resu
 |---------|-------------|
 | `/consensus <question>` | Force consensus mode (multi-agent conflict resolution) |
 | `/perspective "<question>" [agents]` | Multi-perspective analysis with independent solutions |
-| `/build <task>` | Execute a coding task via Architect → Builder pipeline |
 | `/promote <agent>` | Make an agent the primary implementation coordinator |
 | `/demote` | Remove LEAD_SUB promotion |
 | `/status` | Show current orchestration config |
@@ -303,7 +244,7 @@ The Architect plans it, you approve, BuilderAgents write the code. Hand the resu
 
 **Use `/watch` liberally.** The file agent can read anything on disk. If a question involves files outside your configured repos, `/watch` them in.
 
-**Consensus vs Perspective vs Builder:** Consensus is for *verifying accuracy* — it detects contradictions and resolves them. Perspective is for *generating solutions* — it produces independent proposals and synthesizes the best parts. Builder is for *writing code* — it plans, executes, and validates.
+**Consensus vs Perspective:** Consensus is for *verifying accuracy* — it detects contradictions and resolves them. Perspective is for *generating solutions* — it produces independent proposals and synthesizes the best parts.
 
 **Cross-pollination is most valuable when agents use different models.** The whole point is cognitive diversity. Two Claude agents will largely agree. Claude + Grok will disagree in productive ways.
 

@@ -1,2 +1,2 @@
 # multiagentz/tools/__init__.py
-# Tool integrations are stack-specific extensions.
+# Tool integrations (PyLocker, etc.) are stack-specific extensions.

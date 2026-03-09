@@ -105,7 +105,14 @@ class OrchestrationEngine:
         # Get initial responses
         responses = self._parallel_query(queries)
 
-        if len(responses) <= 1:
+        if len(responses) == 0:
+            return "No agent responses received.", {
+                "mode": "consensus",
+                "iterations": 0,
+                "error": "empty_responses",
+            }
+
+        if len(responses) == 1:
             single_response = next(iter(responses.values()))
             return single_response, {
                 "mode": "consensus",
@@ -1025,3 +1032,78 @@ class LEADSUBPromotion:
     @property
     def current_lead_sub(self) -> Optional[str]:
         return self._promoted_agent
+
+
+# ── Builder orchestration ───────────────────────────────────────────────
+
+class BuilderOrchestrationEngine:
+    """
+    Orchestration engine for builder mode.
+
+    Coordinates ArchitectAgent planning and TaskDAG execution.
+    Supports heterogeneous models (e.g. Opus for planning, Sonnet for building).
+    """
+
+    def __init__(self, lead: "LeadAgent"):
+        self.lead = lead
+        self._llm = lead._llm
+
+    def execute_build(
+        self,
+        task: str,
+        workspace_path: str,
+        architect_config: Optional[dict] = None,
+        builder_defaults: Optional[dict] = None,
+    ) -> tuple[str, dict]:
+        """
+        Plan and execute a build task.
+
+        Returns (summary_text, metadata_dict).
+        """
+        from multiagentz.agents.architect import ArchitectAgent
+        from multiagentz.task_dag import TaskDAG
+        from multiagentz.stack import _create_llm_client_from_spec
+
+        architect_config = architect_config or {}
+        builder_defaults = builder_defaults or {}
+
+        # Create architect with optionally different model
+        arch_llm = _create_llm_client_from_spec(architect_config)
+        architect = ArchitectAgent(
+            workspace_path=workspace_path,
+            llm_client=arch_llm or self._llm,
+        )
+
+        # Phase 1: Plan
+        log.phase(1, 2, "Planning")
+        try:
+            plan = architect.plan(task)
+        except Exception as e:
+            log.error(f"Planning failed: {e}")
+            return f"Planning failed: {e}", {"error": str(e)}
+
+        if not plan or "tasks" not in plan:
+            return "Architect produced no actionable plan.", {"error": "empty_plan"}
+
+        # Phase 2: Execute
+        log.phase(2, 2, "Executing")
+        builder_llm = _create_llm_client_from_spec(builder_defaults)
+
+        dag = TaskDAG(
+            plan=plan,
+            workspace_path=workspace_path,
+            llm_client=builder_llm or self._llm,
+            builder_defaults=builder_defaults,
+            architect=architect,
+        )
+
+        report = dag.execute(original_task=task)
+
+        metadata = {
+            "plan_name": report.get("plan_name", ""),
+            "completed_count": report.get("completed_count", 0),
+            "failed_count": report.get("failed_count", 0),
+            "total_tasks": report.get("total_tasks", 0),
+        }
+
+        return report.get("summary", "Build complete."), metadata

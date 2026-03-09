@@ -9,6 +9,8 @@ build/
 .maz_routing.jsonl
 .maz_watched.json
 outputs/
+.env
+!.env.example
 .DS_Store
 *.so
 *.dylib

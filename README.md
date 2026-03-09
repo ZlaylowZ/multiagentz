@@ -29,8 +29,9 @@ source .venv/bin/activate
 # 4. Install
 pip install -e ".[all]"
 
-# 5. Add your API key(s) to multiagentz/providers.py
-# (just paste your key — no .env files needed)
+# 5. Add your API key(s) to .env
+cp .env.example .env   # then edit .env with your keys
+# e.g. ANTHROPIC_API_KEY=sk-ant-...
 
 # 6. Run
 # First, use preferred LLM to construct YAML stack, then save the .yaml to multiagentz/stacks/example.yaml and then run
@@ -124,22 +125,24 @@ Provider is automatically detected from model name (`claude-*` -> Anthropic, `gr
 
 ## Configuration
 
-### API Keys (providers.py)
+### API Keys (.env)
 
-Edit `multiagentz/providers.py` and paste your API keys:
+Create a `.env` file in the project root with your API keys:
 
-```python
-PROVIDERS = {
-    "anthropic": {
-        "api_key": "sk-ant-...",  # Paste your key here
-        "default_model": "claude-sonnet-4-20250514",
-    },
-    "openai": {
-        "api_key": "sk-...",
-        "default_model": "o4-mini",
-    },
-    # ... xai, google
-}
+```bash
+# You only need ONE provider to get started
+ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+# XAI_API_KEY=xai-...
+# GOOGLE_API_KEY=...
+# MISTRAL_API_KEY=...
+
+# Optional: override the default model for a provider
+# ANTHROPIC_MODEL=claude-opus-4-6
+# XAI_MODEL=grok-4-fast-reasoning
+
+# Optional: global model override (any provider)
+# MAZ_LLM_MODEL=claude-sonnet-4-20250514
 ```
 
 You only need **one** provider to get started. For cross-pollination (twin agents), use the same model (e.g., TwinA_claude-opus, TwinB_claude-opus) or use different providers and models.

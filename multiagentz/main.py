@@ -17,6 +17,8 @@ from __future__ import annotations
 import sys
 import os
 import argparse
+import subprocess
+import tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -141,6 +143,7 @@ def print_help():
         ("/demote", "Demote current LEAD_SUB"),
         ("/consensus <question>", "Force consensus mode for a query"),
         ('/perspective "<q>" [agents]', "Multi-perspective analysis"),
+        ("/build <task>", "Plan and execute a coding task"),
         ("quit", "Exit"),
     ]
     for cmd, desc in commands:
@@ -177,14 +180,91 @@ def print_orchestration_status(lead):
         for a, b in twin_map.items():
             pair = tuple(sorted([a, b]))
             if pair not in seen:
-                pairs.append(f"{a} ↔ {b}")
+                pairs.append(f"{a} <-> {b}")
                 seen.add(pair)
         table.add_row("Twin Pairs", ", ".join(pairs))
+
+    # Builder config
+    builder_workspace = lead.orchestration_config.get("workspace")
+    if builder_workspace:
+        table.add_row("Builder Workspace", builder_workspace)
+        arch_model = lead.orchestration_config.get("architect_config", {}).get("model", "(default)")
+        table.add_row("Architect Model", arch_model)
+        builder_model = lead.orchestration_config.get("builder_defaults", {}).get("model", "(default)")
+        table.add_row("Builder Model", builder_model)
 
     # Agents
     table.add_row("Agents", ", ".join(lead.agents.keys()))
 
     console.print(table)
+
+
+# ── Plan editing ────────────────────────────────────────────────────────
+
+def _edit_plan_in_editor(plan: dict) -> dict | None:
+    """
+    Dump plan to a temp YAML file, open $EDITOR, and reload.
+
+    Returns the edited plan dict, or None if editing failed.
+    The YAML is annotated with comments explaining the format.
+    """
+    import yaml
+
+    # Build annotated YAML content
+    header = (
+        "# ── Build Plan ──\n"
+        "# Edit tasks below, then save and close your editor.\n"
+        "#\n"
+        "# You can:\n"
+        "#   - Remove tasks (delete the entire task block)\n"
+        "#   - Reorder tasks (move blocks around)\n"
+        "#   - Edit descriptions, depends_on, validation, relevant_files\n"
+        "#   - Add new tasks (must have unique 'id')\n"
+        "#\n"
+        "# Task format:\n"
+        "#   - id: unique_task_id\n"
+        "#     description: What to do\n"
+        "#     relevant_files: [file1.py, file2.py]\n"
+        "#     output_files: [new_file.py]\n"
+        "#     depends_on: [other_task_id]\n"
+        "#     validation: [\"python -m py_compile {file}\"]\n"
+        "#\n\n"
+    )
+
+    plan_yaml = yaml.dump(plan, default_flow_style=False, sort_keys=False, width=120)
+
+    editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "vi"))
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", prefix="maz_plan_", delete=False
+        ) as f:
+            f.write(header)
+            f.write(plan_yaml)
+            tmp_path = f.name
+
+        # Open editor (blocks until user saves and closes)
+        subprocess.run([editor, tmp_path], check=True)
+
+        # Reload edited plan
+        edited_text = Path(tmp_path).read_text(encoding="utf-8")
+        edited_plan = yaml.safe_load(edited_text)
+
+        # Basic validation
+        if not isinstance(edited_plan, dict) or "tasks" not in edited_plan:
+            return None
+        if not isinstance(edited_plan["tasks"], list) or len(edited_plan["tasks"]) == 0:
+            return None
+
+        return edited_plan
+
+    except Exception:
+        return None
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 # ── Main loop ───────────────────────────────────────────────────────────
@@ -437,6 +517,126 @@ def main():
                 
                 # Export to HTML
                 filepath = export_response(response, actual_question, fmt="html")
+                console.print(f"\n[dim]Saved: {filepath}[/dim]\n")
+                continue
+
+            # Build mode
+            if question.lower().startswith("/build "):
+                task = question[7:].strip()
+                if not task:
+                    console.print("[red]Usage: /build <task description>[/red]\n")
+                    continue
+
+                # Check if builder mode is configured
+                workspace = lead.orchestration_config.get("workspace")
+                if not workspace:
+                    console.print("[red]Builder mode requires 'workspace' in orchestration config.[/red]")
+                    console.print("[dim]Add 'workspace: /path/to/project' to your stack YAML.[/dim]\n")
+                    continue
+
+                console.print("[cyan]Planning...[/cyan]\n")
+
+                # Phase 1: Plan
+                from multiagentz.agents.architect import ArchitectAgent
+                from multiagentz.llm_client import LLMClient as _LLMClient
+                from multiagentz.stack import _create_llm_client_from_spec as _make_llm
+
+                architect_config = lead.orchestration_config.get("architect_config", {})
+                arch_llm = _make_llm(architect_config)
+
+                architect = ArchitectAgent(
+                    workspace_path=workspace,
+                    llm_client=arch_llm or lead._llm,
+                )
+
+                try:
+                    plan = architect.plan(task)
+                except Exception as e:
+                    console.print(f"[red]Planning failed: {e}[/red]\n")
+                    continue
+
+                if not plan or "tasks" not in plan:
+                    console.print("[red]Architect produced no actionable plan.[/red]\n")
+                    continue
+
+                # Show plan for approval
+                console.print(f"\n[bold]Plan: {plan.get('plan_name', 'unnamed')}[/bold]")
+                for t in plan["tasks"]:
+                    deps = f" (after {', '.join(t.get('depends_on', []))})" if t.get("depends_on") else ""
+                    console.print(f"  [green]{t['id']}[/green]: {t['description']}{deps}")
+
+                    validation = t.get("validation", [])
+                    if validation:
+                        console.print(f"       [dim]validate: {', '.join(validation)}[/dim]")
+
+                # Plan approval with optional editing
+                while True:
+                    confirm = input("\nExecute this plan? [y/e/N] (e=edit in $EDITOR) ").strip().lower()
+                    if confirm == "e":
+                        plan = _edit_plan_in_editor(plan)
+                        if plan is None:
+                            console.print("[red]Plan edit failed or produced invalid YAML.[/red]\n")
+                            plan = None
+                            break
+                        # Re-display edited plan
+                        console.print(f"\n[bold]Edited Plan: {plan.get('plan_name', 'unnamed')}[/bold]")
+                        for t in plan["tasks"]:
+                            deps = f" (after {', '.join(t.get('depends_on', []))})" if t.get("depends_on") else ""
+                            console.print(f"  [green]{t['id']}[/green]: {t['description']}{deps}")
+                            validation = t.get("validation", [])
+                            if validation:
+                                console.print(f"       [dim]validate: {', '.join(validation)}[/dim]")
+                        continue  # Ask again
+                    elif confirm == "y":
+                        break
+                    else:
+                        plan = None
+                        break
+
+                if plan is None:
+                    console.print("[dim]Cancelled.[/dim]\n")
+                    continue
+
+                # Phase 2: Execute
+                from multiagentz.task_dag import TaskDAG
+
+                builder_defaults = lead.orchestration_config.get("builder_defaults", {})
+                builder_llm = _make_llm(builder_defaults)
+
+                console.print("\n[cyan]Executing...[/cyan]\n")
+
+                dag = TaskDAG(
+                    plan=plan,
+                    workspace_path=workspace,
+                    llm_client=builder_llm or lead._llm,
+                    builder_defaults=builder_defaults,
+                    architect=architect,
+                )
+                report = dag.execute(original_task=task)
+
+                # Phase 3: Report
+                summary = report.get("summary", "Build complete.")
+
+                memory.add_user(f"/build {task}")
+                memory.add_assistant(summary)
+
+                last_response = summary
+                last_question = task
+
+                # Display metadata
+                console.print(
+                    f"\n[dim]Tasks: {report.get('completed_count', 0)}/{report.get('total_tasks', 0)} completed | "
+                    f"Failed: {report.get('failed_count', 0)}[/dim]\n"
+                )
+
+                if len(summary) > MAX_DISPLAY:
+                    display_response(summary[:2000] + "\n\n... [truncated] ...",
+                                     title="[bold blue]Build Result (Preview)[/bold blue]")
+                else:
+                    display_response(summary, title="[bold blue]Build Result[/bold blue]")
+
+                # Export to HTML
+                filepath = export_response(summary, task, fmt="html")
                 console.print(f"\n[dim]Saved: {filepath}[/dim]\n")
                 continue
 
