@@ -35,9 +35,16 @@ import os
 from typing import Optional, Tuple
 from urllib.parse import urlparse
 
+from pathlib import Path as _Path
 from dotenv import find_dotenv, load_dotenv
 
-load_dotenv(find_dotenv(usecwd=True))
+# Load keys from ~/.config/multiagentz/.env first (lowest priority),
+# then from project-local .env (higher priority).
+# Environment variables always win over both.
+_global_env = _Path.home() / ".config" / "multiagentz" / ".env"
+if _global_env.exists():
+    load_dotenv(_global_env)
+load_dotenv(find_dotenv(usecwd=True), override=True)
 
 # ── providers.py fallback ─────────────────────────────────────────────
 # If the user edited providers.py directly (instead of .env), read those
