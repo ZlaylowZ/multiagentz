@@ -145,14 +145,26 @@ class LLMClient:
         # Validate before constructing SDK client
         if not self._api_key:
             configured = [
-                p for p in ["anthropic", "openai", "xai", "google"]
+                p for p in ["anthropic", "openai", "xai", "google", "mistral", "cohere", "nvidia"]
                 if llm_config.get_api_key_for_provider(p)
             ]
-            hint = f" Configured providers: {configured}." if configured else ""
+            if self._provider:
+                provider_label = self._provider
+                env_var_hint = f"  Set {self._provider.upper()}_API_KEY in your .env file or providers.py."
+            else:
+                provider_label = "unknown"
+                env_var_hint = "  Set at least one provider API key in your .env file or providers.py."
+
+            hint = f"\n  Configured providers: {configured}" if configured else ""
+            import pathlib
+            providers_path = pathlib.Path(__file__).resolve().parent / "providers.py"
             raise ValueError(
-                f"No API key for provider '{self._provider}' "
-                f"(model: {self._model}).{hint} "
-                f"Set {self._provider.upper()}_API_KEY in your .env file."
+                f"\n"
+                f"  No API key found for provider '{provider_label}'"
+                f" (model: {self._model}).\n"
+                f"{env_var_hint}\n"
+                f"  Or edit: {providers_path}\n"
+                f"{hint}"
             )
 
         # Initialize SDK client

@@ -17,19 +17,25 @@ You describe your agent hierarchy in a YAML file — which code repositories eac
 # brew install gh (and install homebrew if necesary)
 gh repo clone ZlaylowZ/multiagentz
 
-# 2. Change directory location of unzipped repo directory
+# 2. Go into the repo directory
 
-cd /Users/<username>/path/to/repo
+cd multiagentz
 
 # 3. Install Python (preferably via homebrew) [ask agent for assistance if unsure)
-# Create a python venv and cd to its location
+# Create a virtual environment and activate it
 
+python3 -m venv .venv
 source .venv/bin/activate
 
 # 4. Install
 pip install -e ".[all]"
 
-# 5. Add your API key(s) to .env
+# 5. Add your API key(s) — pick ONE of these two options:
+#
+#   OPTION A (easiest): Open multiagentz/providers.py and replace
+#            "YOUR_..._HERE" with your actual API key
+#
+#   OPTION B: Copy .env.example to .env and add your key there:
 cp .env.example .env   # then edit .env with your keys
 # e.g. ANTHROPIC_API_KEY=sk-ant-...
 

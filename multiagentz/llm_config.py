@@ -39,6 +39,37 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv(usecwd=True))
 
+# ── providers.py fallback ─────────────────────────────────────────────
+# If the user edited providers.py directly (instead of .env), read those
+# values as a fallback.  Environment variables always take priority.
+try:
+    from multiagentz.providers import PROVIDERS as _FILE_PROVIDERS
+    from multiagentz.providers import DEFAULT_MODEL as _FILE_DEFAULT_MODEL
+except ImportError:
+    _FILE_PROVIDERS: dict = {}
+    _FILE_DEFAULT_MODEL: Optional[str] = None
+
+
+def _provider_file_key(provider: str) -> Optional[str]:
+    """Return the API key from providers.py, ignoring placeholder values."""
+    entry = _FILE_PROVIDERS.get(provider, {})
+    key = entry.get("api_key")
+    if key and not key.startswith("YOUR_"):
+        return key
+    return None
+
+
+def _provider_file_model(provider: str) -> Optional[str]:
+    """Return the default model from providers.py for a given provider."""
+    entry = _FILE_PROVIDERS.get(provider, {})
+    return entry.get("default_model")
+
+
+def _provider_file_base_url(provider: str) -> Optional[str]:
+    """Return the base_url from providers.py for a given provider."""
+    entry = _FILE_PROVIDERS.get(provider, {})
+    return entry.get("base_url")
+
 
 def _infer_provider_from_model(model: Optional[str]) -> str:
     """Infer provider from model name."""
@@ -111,40 +142,45 @@ class LLMConfig:
     }
 
     def __init__(self):
-        # Provider-specific environment variables
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.anthropic_model = os.getenv("ANTHROPIC_MODEL")
-        
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        self.openai_base_url = os.getenv("OPENAI_BASE_URL")
-        self.openai_model = os.getenv("OPENAI_MODEL")
-        
-        self.xai_api_key = os.getenv("XAI_API_KEY")
-        self.xai_base_url = os.getenv("XAI_BASE_URL") or PROVIDER_BASE_URLS["xai"]
-        self.xai_model = os.getenv("XAI_MODEL")
-        
-        self.mistral_api_key = os.getenv("MISTRAL_API_KEY")
-        self.mistral_base_url = os.getenv("MISTRAL_BASE_URL") or PROVIDER_BASE_URLS["mistral"]
-        self.mistral_model = os.getenv("MISTRAL_MODEL")
-        
-        self.google_api_key = os.getenv("GOOGLE_API_KEY")
-        self.google_base_url = os.getenv("GOOGLE_BASE_URL") or PROVIDER_BASE_URLS["google"]
-        self.google_model = os.getenv("GOOGLE_MODEL")
-        
-        self.cohere_api_key = os.getenv("COHERE_API_KEY")
-        self.cohere_base_url = os.getenv("COHERE_BASE_URL") or PROVIDER_BASE_URLS["cohere"]
-        self.cohere_model = os.getenv("COHERE_MODEL")
-        
-        self.nvidia_api_key = os.getenv("NVIDIA_API_KEY")
-        self.nvidia_base_url = os.getenv("NVIDIA_BASE_URL") or PROVIDER_BASE_URLS["nvidia"]
-        self.nvidia_model = os.getenv("NVIDIA_MODEL")
-        
-        self.ollama_api_key = os.getenv("OLLAMA_API_KEY") or "ollama"
-        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL") or PROVIDER_BASE_URLS["ollama"]
-        self.ollama_model = os.getenv("OLLAMA_MODEL")
+        # Provider-specific configuration.
+        # Priority: environment variables > .env file > providers.py
+        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or _provider_file_key("anthropic")
+        self.anthropic_model = os.getenv("ANTHROPIC_MODEL") or _provider_file_model("anthropic")
 
-        # Global override via MAZ_LLM_MODEL
-        explicit_model = os.getenv("MAZ_LLM_MODEL") or os.getenv("AGENTZ_LLM_MODEL")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY") or _provider_file_key("openai")
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL") or _provider_file_base_url("openai")
+        self.openai_model = os.getenv("OPENAI_MODEL") or _provider_file_model("openai")
+
+        self.xai_api_key = os.getenv("XAI_API_KEY") or _provider_file_key("xai")
+        self.xai_base_url = os.getenv("XAI_BASE_URL") or _provider_file_base_url("xai") or PROVIDER_BASE_URLS["xai"]
+        self.xai_model = os.getenv("XAI_MODEL") or _provider_file_model("xai")
+
+        self.mistral_api_key = os.getenv("MISTRAL_API_KEY") or _provider_file_key("mistral")
+        self.mistral_base_url = os.getenv("MISTRAL_BASE_URL") or _provider_file_base_url("mistral") or PROVIDER_BASE_URLS["mistral"]
+        self.mistral_model = os.getenv("MISTRAL_MODEL") or _provider_file_model("mistral")
+
+        self.google_api_key = os.getenv("GOOGLE_API_KEY") or _provider_file_key("google")
+        self.google_base_url = os.getenv("GOOGLE_BASE_URL") or _provider_file_base_url("google") or PROVIDER_BASE_URLS["google"]
+        self.google_model = os.getenv("GOOGLE_MODEL") or _provider_file_model("google")
+
+        self.cohere_api_key = os.getenv("COHERE_API_KEY") or _provider_file_key("cohere")
+        self.cohere_base_url = os.getenv("COHERE_BASE_URL") or _provider_file_base_url("cohere") or PROVIDER_BASE_URLS["cohere"]
+        self.cohere_model = os.getenv("COHERE_MODEL") or _provider_file_model("cohere")
+
+        self.nvidia_api_key = os.getenv("NVIDIA_API_KEY") or _provider_file_key("nvidia")
+        self.nvidia_base_url = os.getenv("NVIDIA_BASE_URL") or _provider_file_base_url("nvidia") or PROVIDER_BASE_URLS["nvidia"]
+        self.nvidia_model = os.getenv("NVIDIA_MODEL") or _provider_file_model("nvidia")
+
+        self.ollama_api_key = os.getenv("OLLAMA_API_KEY") or _provider_file_key("ollama") or "ollama"
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL") or _provider_file_base_url("ollama") or PROVIDER_BASE_URLS["ollama"]
+        self.ollama_model = os.getenv("OLLAMA_MODEL") or _provider_file_model("ollama")
+
+        # Global override via MAZ_LLM_MODEL or providers.py DEFAULT_MODEL
+        explicit_model = (
+            os.getenv("MAZ_LLM_MODEL")
+            or os.getenv("AGENTZ_LLM_MODEL")
+            or _FILE_DEFAULT_MODEL
+        )
 
         if explicit_model:
             # Infer provider from model name
@@ -235,10 +271,36 @@ class LLMConfig:
             return None
 
     def validate(self) -> None:
-        if not self.llm_api_key:
+        if not self._llm_provider or not self.llm_api_key:
+            import pathlib
+            pkg_dir = pathlib.Path(__file__).resolve().parent
+            providers_path = pkg_dir / "providers.py"
+            env_path = pathlib.Path.cwd() / ".env"
+
             raise ValueError(
-                f"No API key for provider '{self.llm_provider}'. "
-                f"Set {self.llm_provider.upper()}_API_KEY in your .env file."
+                "\n"
+                "╔══════════════════════════════════════════════════════════════╗\n"
+                "║              No API key found!                              ║\n"
+                "╚══════════════════════════════════════════════════════════════╝\n"
+                "\n"
+                "  multiagentz needs at least ONE AI provider API key to run.\n"
+                "  You can set your key in either of these two ways:\n"
+                "\n"
+                "  OPTION 1 — Edit providers.py (easiest, no programming needed):\n"
+                f"    Open this file:  {providers_path}\n"
+                "    Find the provider you want (e.g. Anthropic, OpenAI, xAI)\n"
+                "    Replace \"YOUR_..._HERE\" with your actual API key.\n"
+                "\n"
+                "  OPTION 2 — Create a .env file:\n"
+                f"    In this folder:  {env_path.parent}\n"
+                "    Copy .env.example to .env, then add your key, e.g.:\n"
+                "      ANTHROPIC_API_KEY=sk-ant-...\n"
+                "\n"
+                "  Where to get an API key:\n"
+                "    Anthropic (Claude):  https://console.anthropic.com/settings/keys\n"
+                "    OpenAI (GPT):        https://platform.openai.com/api-keys\n"
+                "    xAI (Grok):          https://console.x.ai/\n"
+                "    Google (Gemini):     https://aistudio.google.com/apikey\n"
             )
 
 

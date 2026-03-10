@@ -4,7 +4,7 @@
 # backend + frontend split.
 #
 # Usage:
-#   maz --config examples/minimal.yaml
+#   maz --config stacks/minimal.yaml
 # ──────────────────────────────────────────────────────────────────────
 
 name: my-project
