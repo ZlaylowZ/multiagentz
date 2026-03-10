@@ -38,7 +38,7 @@ maz setup
 
 maz --config stacks/example.yaml
 ```
-> **New to this?** See [SETUP.md](SETUP.md) for a complete beginner walkthrough with Claude Code.
+> **Don't have Python or Homebrew?** See [SETUP.md](SETUP.md) for Mac/Windows/Linux prerequisites and a complete beginner walkthrough.
 > **Want the full picture?** See [GUIDE.md](GUIDE.md) for the user guide covering all complexity levels and the maz → Claude Code workflow.
 
 ## Features

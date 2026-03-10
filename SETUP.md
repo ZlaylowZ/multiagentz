@@ -5,6 +5,113 @@ Follow the steps in order. If you get stuck, paste the error into Claude Code an
 
 ---
 
+## Prerequisites (do this first)
+
+### Mac
+
+You need two things: **Homebrew** (Mac's package manager) and **Python 3.10+**.
+
+**1. Open Terminal**
+Press Cmd+Space, type "Terminal", press Enter.
+
+**2. Install Homebrew** (if you don't have it)
+
+Paste this entire line and press Enter:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+- It will ask for your Mac password. Type it — nothing appears as you type, that's normal.
+- Wait 2-5 minutes.
+- **Important:** When it finishes, it prints instructions about adding Homebrew to your PATH. Copy and run those lines. They usually look like:
+```bash
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+- Verify: `brew --version` should print a version number.
+
+**3. Install Python** (if you don't have it)
+```bash
+brew install python@3.12
+```
+Verify: `python3 --version` should print 3.10 or higher.
+
+**4. Install the GitHub CLI** (for cloning the repo)
+```bash
+brew install gh
+```
+
+You're ready — skip to [Quick Start](#quick-start-all-platforms) below.
+
+---
+
+### Windows
+
+**1. Install Python**
+- Go to https://www.python.org/downloads/
+- Download Python 3.12 (or latest 3.x)
+- Run the installer
+- **CRITICAL: Check the box that says "Add python.exe to PATH"** before clicking Install. If you miss this, nothing will work from the command line.
+- Click "Install Now"
+- Verify: Open **Command Prompt** (search "cmd" in Start menu) and type `python --version`. It should print 3.10 or higher.
+
+> If `python` isn't found but you just installed it, close and reopen Command Prompt. If it still doesn't work, you missed the PATH checkbox — uninstall Python from Settings > Apps, reinstall, and check the box this time.
+
+**2. Install Git**
+- Go to https://git-scm.com/download/win
+- Download and run the installer
+- Accept all defaults (just keep clicking Next)
+- Verify: `git --version` in Command Prompt
+
+**3. Install the GitHub CLI** (optional but recommended)
+- Go to https://cli.github.com/
+- Download the Windows installer
+- Run it
+- Verify: `gh --version` in Command Prompt
+
+**4. Windows-specific gotchas**
+- Use **Command Prompt** or **PowerShell**, not Git Bash (Git Bash can cause venv activation issues)
+- The venv activation command is different on Windows:
+  ```
+  .venv\Scripts\activate
+  ```
+  (not `source .venv/bin/activate` — that's the Mac/Linux version)
+- If you see `"python3" is not recognized`, try `python` instead (Windows usually installs it as `python`, not `python3`)
+- If `pip` doesn't work, try `python -m pip install ...` instead
+
+---
+
+### Linux
+
+You probably already know what you're doing. Make sure you have:
+```bash
+sudo apt install python3 python3-venv python3-pip git   # Debian/Ubuntu
+# or
+sudo dnf install python3 python3-pip git                 # Fedora
+```
+
+---
+
+## Quick Start (all platforms)
+
+```bash
+# Clone
+gh repo clone ZlaylowZ/multiagentz    # or: git clone https://github.com/ZlaylowZ/multiagentz.git
+cd multiagentz
+
+# Create virtual environment and install
+python3 -m venv .venv                  # Windows: python -m venv .venv
+source .venv/bin/activate              # Windows: .venv\Scripts\activate
+pip install -e ".[all]"
+
+# Set up API keys (interactive wizard)
+maz setup
+
+# Run
+maz --config stacks/example.yaml
+```
+
+---
+
 ## Step 1: Install Claude Code (your AI assistant)
 
 Claude Code is a terminal-based AI assistant that will handle all the technical
@@ -199,15 +306,17 @@ of figuring everything out from scratch.
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `command not found: python3` | Run: `brew install python@3.12` |
-| `command not found: brew` | See Step 1c above |
-| `command not found: maz` | Make sure you activated the venv: `source .venv/bin/activate` |
-| `No API keys configured` | Add your API key to `.env` (e.g. `ANTHROPIC_API_KEY=sk-ant-...`) |
-| `No API key for provider` | Set the matching `{PROVIDER}_API_KEY` in your `.env` file |
-| `ModuleNotFoundError` | Re-run: `pip install -e ".[all]"` |
-| Anything else | Paste the error into Claude Code — it'll figure it out |
+| Problem | Platform | Fix |
+|---------|----------|-----|
+| `command not found: python3` | Mac | Run: `brew install python@3.12` |
+| `"python3" is not recognized` | Windows | Use `python` instead of `python3` |
+| `command not found: brew` | Mac | See [Prerequisites — Mac](#mac) above |
+| `command not found: maz` | All | Make sure you activated the venv: `source .venv/bin/activate` (Mac/Linux) or `.venv\Scripts\activate` (Windows) |
+| `No API key found` | All | Run `maz setup` to configure your keys interactively |
+| `ModuleNotFoundError` | All | Re-run: `pip install -e ".[all]"` |
+| venv activation fails in Git Bash | Windows | Use Command Prompt or PowerShell instead of Git Bash |
+| `pip` not found | Windows | Try `python -m pip install ...` instead |
+| Anything else | All | Paste the error into Claude Code — it'll figure it out |
 
 ---
 
