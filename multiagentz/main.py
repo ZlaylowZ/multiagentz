@@ -274,7 +274,12 @@ def main():
     parser.add_argument("--config", "-c", required=True, help="Path to stack YAML config")
     args = parser.parse_args()
 
-    lead = load_stack(args.config)
+    try:
+        lead = load_stack(args.config)
+    except (ValueError, FileNotFoundError) as e:
+        console.print(f"\n[bold red]Setup Error:[/bold red]\n{e}\n")
+        sys.exit(1)
+
     memory = SessionMemory()
     last_response = None
     last_question = None
