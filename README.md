@@ -30,14 +30,8 @@ source .venv/bin/activate
 # 4. Install
 pip install -e ".[all]"
 
-# 5. Add your API key(s) — pick ONE of these two options:
-#
-#   OPTION A (easiest): Open multiagentz/providers.py and replace
-#            "YOUR_..._HERE" with your actual API key
-#
-#   OPTION B: Copy .env.example to .env and add your key there:
-cp .env.example .env   # then edit .env with your keys
-# e.g. ANTHROPIC_API_KEY=sk-ant-...
+# 5. Add your API key(s) — the setup wizard walks you through it
+maz setup
 
 # 6. Run
 # First, use preferred LLM to construct YAML stack, then save the .yaml to multiagentz/stacks/example.yaml and then run

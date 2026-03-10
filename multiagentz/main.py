@@ -267,12 +267,100 @@ def _edit_plan_in_editor(plan: dict) -> dict | None:
             pass
 
 
+# ── Setup wizard ─────────────────────────────────────────────────────────
+
+SETUP_PROVIDERS = [
+    ("ANTHROPIC_API_KEY", "Anthropic (Claude)", "https://console.anthropic.com/settings/keys"),
+    ("OPENAI_API_KEY",    "OpenAI (GPT)",       "https://platform.openai.com/api-keys"),
+    ("XAI_API_KEY",       "xAI (Grok)",         "https://console.x.ai/"),
+    ("GOOGLE_API_KEY",    "Google (Gemini)",     "https://aistudio.google.com/apikey"),
+    ("MISTRAL_API_KEY",   "Mistral",            "https://console.mistral.ai/api-keys"),
+]
+
+
+def run_setup():
+    """Interactive setup wizard — prompts for API keys, saves to ~/.config/multiagentz/.env"""
+    config_dir = Path.home() / ".config" / "multiagentz"
+    env_file = config_dir / ".env"
+
+    console.print(Panel.fit(
+        "[bold blue]multiagentz setup[/bold blue]\n\n"
+        "This will save your API keys so every project can use them.\n"
+        f"Keys are stored in: [cyan]{env_file}[/cyan]\n\n"
+        "[dim]Press Enter to skip any provider you don't use.[/dim]",
+        border_style="blue",
+    ))
+    console.print()
+
+    # Load existing keys if the file already exists
+    existing = {}
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, _, v = line.partition("=")
+                existing[k.strip()] = v.strip()
+
+    keys = {}
+    for env_var, label, url in SETUP_PROVIDERS:
+        current = existing.get(env_var)
+        hint = ""
+        if current:
+            masked = current[:8] + "..." + current[-4:] if len(current) > 16 else "***"
+            hint = f" [dim](current: {masked})[/dim]"
+
+        console.print(f"  [bold]{label}[/bold]{hint}")
+        console.print(f"  [dim]Get a key: {url}[/dim]")
+        value = console.input("  API key: ").strip()
+
+        if value:
+            keys[env_var] = value
+        elif current:
+            keys[env_var] = current  # keep existing
+        console.print()
+
+    if not keys:
+        console.print("[yellow]No keys entered. Setup cancelled.[/yellow]")
+        return
+
+    # Write keys
+    config_dir.mkdir(parents=True, exist_ok=True)
+    lines = ["# multiagentz API keys (created by maz setup)", ""]
+    for k, v in keys.items():
+        lines.append(f"{k}={v}")
+    lines.append("")
+    env_file.write_text("\n".join(lines))
+
+    # Restrict permissions (owner-only read/write)
+    env_file.chmod(0o600)
+
+    saved = [label for env_var, label, _ in SETUP_PROVIDERS if env_var in keys]
+    console.print(Panel.fit(
+        f"[bold green]Saved {len(keys)} key(s) to {env_file}[/bold green]\n"
+        f"Providers: {', '.join(saved)}\n\n"
+        "[dim]You're ready to go! Run:[/dim]\n"
+        "  maz --config stacks/example.yaml",
+        border_style="green",
+    ))
+
+
 # ── Main loop ───────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="Multi-Agent Stack REPL")
-    parser.add_argument("--config", "-c", required=True, help="Path to stack YAML config")
+    parser.add_argument("--config", "-c", help="Path to stack YAML config")
+    parser.add_argument("setup", nargs="?", help="Run interactive setup wizard")
     args = parser.parse_args()
+
+    # Handle `maz setup`
+    if args.setup == "setup":
+        run_setup()
+        return
+
+    if not args.config:
+        parser.print_help()
+        console.print("\n[dim]Tip: Run 'maz setup' first to configure your API keys.[/dim]")
+        return
 
     try:
         lead = load_stack(args.config)
