@@ -379,7 +379,8 @@ def main():
             shell=True, capture_output=True, text=True, timeout=5,
         )
         if banner.returncode == 0 and banner.stdout.strip():
-            console.print(banner.stdout, highlight=False)
+            sys.stdout.write(banner.stdout)
+            sys.stdout.flush()
         else:
             raise RuntimeError("banner failed")
     except Exception:
