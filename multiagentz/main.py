@@ -348,12 +348,12 @@ def run_setup():
 
 def main():
     parser = argparse.ArgumentParser(description="Multi-Agent Stack REPL")
-    parser.add_argument("--config", "-c", required=False, help="Path to stack YAML config")
-    parser.add_argument("command", nargs="?", help="Subcommand (e.g. 'setup')")
+    parser.add_argument("--config", "-c", help="Path to stack YAML config")
+    parser.add_argument("setup", nargs="?", help="Run interactive setup wizard")
     args = parser.parse_args()
 
     # Handle `maz setup`
-    if args.command == "setup":
+    if args.setup == "setup":
         run_setup()
         return
 

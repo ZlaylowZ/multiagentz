@@ -312,7 +312,7 @@ of figuring everything out from scratch.
 | `"python3" is not recognized` | Windows | Use `python` instead of `python3` |
 | `command not found: brew` | Mac | See [Prerequisites — Mac](#mac) above |
 | `command not found: maz` | All | Make sure you activated the venv: `source .venv/bin/activate` (Mac/Linux) or `.venv\Scripts\activate` (Windows) |
-| `No API key found` | All | Run `maz setup` to configure your keys, or create a `.env` file manually (see [README](README.md#api-keys-env)) |
+| `No API key found` | All | Run `maz setup` to configure your keys interactively |
 | `ModuleNotFoundError` | All | Re-run: `pip install -e ".[all]"` |
 | venv activation fails in Git Bash | Windows | Use Command Prompt or PowerShell instead of Git Bash |
 | `pip` not found | Windows | Try `python -m pip install ...` instead |
