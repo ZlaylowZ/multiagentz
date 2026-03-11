@@ -289,12 +289,20 @@ class LLMClient:
         )
     
     @staticmethod
-    def _is_o_series(model: str) -> bool:
-        """Detect OpenAI o-series reasoning models (o1, o3, o4-mini, etc.)."""
+    def _uses_max_completion_tokens(model: str) -> bool:
+        """Detect OpenAI models that require max_completion_tokens instead of max_tokens."""
         m = model.lower()
-        # Match o1, o3, o4-mini, o3-mini, o1-preview, etc.
-        # but NOT "grok-..." or "command-..." or other models with 'o' in them
-        return bool(m.startswith("o") and len(m) > 1 and m[1:2].isdigit())
+        # o-series: o1, o3, o4-mini, o3-mini, o1-preview, etc.
+        if m.startswith("o") and len(m) > 1 and m[1:2].isdigit():
+            return True
+        # gpt-5+: gpt-5, gpt-5.4, gpt-5-turbo, etc.
+        if m.startswith("gpt-"):
+            try:
+                major = int(m[4:5])
+                return major >= 5
+            except ValueError:
+                pass
+        return False
 
     def _complete_openai(
         self,
@@ -303,7 +311,8 @@ class LLMClient:
         max_tokens: int
     ) -> CompletionResult:
         """OpenAI / OpenAI-compatible completion."""
-        is_o = self._is_o_series(self._model)
+        needs_new_api = self._uses_max_completion_tokens(self._model)
+        is_o = self._model.lower().startswith("o") and len(self._model) > 1 and self._model.lower()[1:2].isdigit()
 
         msgs = []
         if system:
@@ -316,8 +325,8 @@ class LLMClient:
             "model": self._model,
             "messages": msgs,
         }
-        # o-series models use max_completion_tokens instead of max_tokens
-        if is_o:
+        # newer OpenAI models use max_completion_tokens instead of max_tokens
+        if needs_new_api:
             kw["max_completion_tokens"] = max_tokens
         else:
             kw["max_tokens"] = max_tokens
