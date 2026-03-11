@@ -372,12 +372,24 @@ def main():
     last_response = None
     last_question = None
 
+    # Rainbow ASCII banner (requires figlet + lolcat; falls back to plain text)
+    try:
+        banner = subprocess.run(
+            "figlet -f isometric3 maz | lolcat -f -F 0.3",
+            shell=True, capture_output=True, text=True, timeout=5,
+        )
+        if banner.returncode == 0 and banner.stdout.strip():
+            console.print(banner.stdout, highlight=False)
+        else:
+            raise RuntimeError("banner failed")
+    except Exception:
+        console.print("[bold blue]  maz[/bold blue] ⚡ multi-agent orchestration\n")
+
     console.print(Panel.fit(
-        f"[bold blue]Multi-Agent Stack Ready[/bold blue]\n"
+        f"[bold blue]Stack Ready[/bold blue]\n"
         f"Stack: [cyan]{lead.name}[/cyan]  |  "
         f"Agents: [green]{', '.join(lead.agents.keys())}[/green]\n"
         f"Mode: [yellow]{lead.orchestration_mode}[/yellow]",
-        title="🤖 maz",
         border_style="blue",
     ))
     console.print("[dim]Type /help for commands[/dim]\n")
