@@ -43,7 +43,7 @@ from dotenv import find_dotenv, load_dotenv
 # Environment variables always win over both.
 _global_env = _Path.home() / ".config" / "multiagentz" / ".env"
 if _global_env.exists():
-    load_dotenv(_global_env)
+    load_dotenv(_global_env, override=True)
 load_dotenv(find_dotenv(usecwd=True), override=True)
 
 # ── providers.py fallback ─────────────────────────────────────────────
@@ -57,13 +57,36 @@ except ImportError:
     _FILE_DEFAULT_MODEL: Optional[str] = None
 
 
+def _is_placeholder(value: Optional[str]) -> bool:
+    """Return True if the value looks like a placeholder, not a real API key."""
+    if not value:
+        return True
+    v = value.strip().strip('"').strip("'")
+    if not v:
+        return True
+    low = v.lower()
+    if low.startswith("your_") or low.startswith("enter ") or low.startswith("paste "):
+        return True
+    if "api key" in low or "api_key" in low and "here" in low:
+        return True
+    return False
+
+
+def _clean_env_key(env_var: str) -> Optional[str]:
+    """Read an env var, returning None if it's empty or a placeholder."""
+    val = os.getenv(env_var)
+    if _is_placeholder(val):
+        return None
+    return val
+
+
 def _provider_file_key(provider: str) -> Optional[str]:
     """Return the API key from providers.py, ignoring placeholder values."""
     entry = _FILE_PROVIDERS.get(provider, {})
     key = entry.get("api_key")
-    if key and not key.startswith("YOUR_"):
-        return key
-    return None
+    if _is_placeholder(key):
+        return None
+    return key
 
 
 def _provider_file_model(provider: str) -> Optional[str]:
@@ -151,34 +174,35 @@ class LLMConfig:
     def __init__(self):
         # Provider-specific configuration.
         # Priority: environment variables > .env file > providers.py
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or _provider_file_key("anthropic")
+        # _clean_env_key filters out placeholder values like "Enter your API key"
+        self.anthropic_api_key = _clean_env_key("ANTHROPIC_API_KEY") or _provider_file_key("anthropic")
         self.anthropic_model = os.getenv("ANTHROPIC_MODEL") or _provider_file_model("anthropic")
 
-        self.openai_api_key = os.getenv("OPENAI_API_KEY") or _provider_file_key("openai")
+        self.openai_api_key = _clean_env_key("OPENAI_API_KEY") or _provider_file_key("openai")
         self.openai_base_url = os.getenv("OPENAI_BASE_URL") or _provider_file_base_url("openai")
         self.openai_model = os.getenv("OPENAI_MODEL") or _provider_file_model("openai")
 
-        self.xai_api_key = os.getenv("XAI_API_KEY") or _provider_file_key("xai")
+        self.xai_api_key = _clean_env_key("XAI_API_KEY") or _provider_file_key("xai")
         self.xai_base_url = os.getenv("XAI_BASE_URL") or _provider_file_base_url("xai") or PROVIDER_BASE_URLS["xai"]
         self.xai_model = os.getenv("XAI_MODEL") or _provider_file_model("xai")
 
-        self.mistral_api_key = os.getenv("MISTRAL_API_KEY") or _provider_file_key("mistral")
+        self.mistral_api_key = _clean_env_key("MISTRAL_API_KEY") or _provider_file_key("mistral")
         self.mistral_base_url = os.getenv("MISTRAL_BASE_URL") or _provider_file_base_url("mistral") or PROVIDER_BASE_URLS["mistral"]
         self.mistral_model = os.getenv("MISTRAL_MODEL") or _provider_file_model("mistral")
 
-        self.google_api_key = os.getenv("GOOGLE_API_KEY") or _provider_file_key("google")
+        self.google_api_key = _clean_env_key("GOOGLE_API_KEY") or _provider_file_key("google")
         self.google_base_url = os.getenv("GOOGLE_BASE_URL") or _provider_file_base_url("google") or PROVIDER_BASE_URLS["google"]
         self.google_model = os.getenv("GOOGLE_MODEL") or _provider_file_model("google")
 
-        self.cohere_api_key = os.getenv("COHERE_API_KEY") or _provider_file_key("cohere")
+        self.cohere_api_key = _clean_env_key("COHERE_API_KEY") or _provider_file_key("cohere")
         self.cohere_base_url = os.getenv("COHERE_BASE_URL") or _provider_file_base_url("cohere") or PROVIDER_BASE_URLS["cohere"]
         self.cohere_model = os.getenv("COHERE_MODEL") or _provider_file_model("cohere")
 
-        self.nvidia_api_key = os.getenv("NVIDIA_API_KEY") or _provider_file_key("nvidia")
+        self.nvidia_api_key = _clean_env_key("NVIDIA_API_KEY") or _provider_file_key("nvidia")
         self.nvidia_base_url = os.getenv("NVIDIA_BASE_URL") or _provider_file_base_url("nvidia") or PROVIDER_BASE_URLS["nvidia"]
         self.nvidia_model = os.getenv("NVIDIA_MODEL") or _provider_file_model("nvidia")
 
-        self.ollama_api_key = os.getenv("OLLAMA_API_KEY") or _provider_file_key("ollama") or "ollama"
+        self.ollama_api_key = _clean_env_key("OLLAMA_API_KEY") or _provider_file_key("ollama") or "ollama"
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL") or _provider_file_base_url("ollama") or PROVIDER_BASE_URLS["ollama"]
         self.ollama_model = os.getenv("OLLAMA_MODEL") or _provider_file_model("ollama")
 

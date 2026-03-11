@@ -278,6 +278,16 @@ SETUP_PROVIDERS = [
 ]
 
 
+def _is_setup_placeholder(value: str) -> bool:
+    """Return True if the value looks like a placeholder, not a real API key."""
+    low = value.lower().strip()
+    if low.startswith(("your_", "enter ", "paste ", "put ", "add ", "insert ")):
+        return True
+    if "api key" in low or "api_key" in low:
+        return True
+    return False
+
+
 def run_setup():
     """Interactive setup wizard — prompts for API keys, saves to ~/.config/multiagentz/.env"""
     config_dir = Path.home() / ".config" / "multiagentz"
@@ -311,11 +321,11 @@ def run_setup():
 
         console.print(f"  [bold]{label}[/bold]{hint}")
         console.print(f"  [dim]Get a key: {url}[/dim]")
-        value = console.input("  API key: ").strip()
+        value = console.input("  API key: ").strip().strip('"').strip("'")
 
-        if value:
+        if value and not _is_setup_placeholder(value):
             keys[env_var] = value
-        elif current:
+        elif current and not _is_setup_placeholder(current):
             keys[env_var] = current  # keep existing
         console.print()
 
