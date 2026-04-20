@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>multiagentz Architecture Guide</title>
+<style>
+/* ================================================================
+   RESET & BASE
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #0f172a;
+  --bg-card:    #1e293b;
+  --bg-card-alt:#162032;
+  --bg-code:    #0d1424;
+  --border:     #334155;
+  --border-glow:#475569;
+  --text:       #e2e8f0;
+  --text-dim:   #94a3b8;
+  --text-muted: #64748b;
+  --accent:     #38bdf8;
+  --accent2:    #818cf8;
+  --accent3:    #a78bfa;
+  --green:      #34d399;
+  --green-dim:  #065f46;
+  --orange:     #fb923c;
+  --orange-dim: #7c2d12;
+  --red:        #f87171;
+  --red-dim:    #7f1d1d;
+  --pink:       #f472b6;
+  --yellow:     #fbbf24;
+  --cyan:       #22d3ee;
+  --teal:       #2dd4bf;
+  --radius:     12px;
+  --radius-sm:  8px;
+  --shadow:     0 4px 24px rgba(0,0,0,0.35);
+  --font:       'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --mono:       'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ================================================================
+   TYPOGRAPHY
+   ================================================================ */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+h1 { font-size: 2.5rem; }
+h2 { font-size: 1.85rem; margin-bottom: 1rem; }
+h3 { font-size: 1.35rem; margin-bottom: 0.75rem; }
+h4 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+
+p { margin-bottom: 1rem; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+strong { color: #f1f5f9; }
+em { color: var(--text-dim); font-style: italic; }
+
+/* ================================================================
+   LAYOUT
+   ================================================================ */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+section {
+  padding: 72px 0;
+  border-bottom: 1px solid var(--border);
+}
+section:last-of-type { border-bottom: none; }
+
+/* ================================================================
+   NAV — sticky top
+   ================================================================ */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+}
+nav .nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 12px 0;
+}
+nav .nav-inner::-webkit-scrollbar { display: none; }
+
+nav a {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 20px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+nav a:hover {
+  color: var(--accent);
+  background: rgba(56,189,248,0.08);
+  border-color: rgba(56,189,248,0.15);
+  text-decoration: none;
+}
+.nav-brand {
+  font-weight: 800;
+  font-size: 1rem !important;
+  color: var(--accent) !important;
+  letter-spacing: -0.02em;
+  margin-right: 12px;
+  padding: 6px 0 !important;
+}
+
+/* ================================================================
+   HERO
+   ================================================================ */
+.hero {
+  padding: 100px 0 80px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(56,189,248,0.06) 0%, transparent 100%);
+}
+.hero h1 {
+  font-size: 3.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+}
+.hero .subtitle {
+  font-size: 1.25rem;
+  color: var(--text-dim);
+  max-width: 700px;
+  margin: 0 auto 36px;
+  line-height: 1.7;
+}
+.hero .insight {
+  display: inline-block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 32px;
+  font-size: 1.05rem;
+  color: var(--yellow);
+  font-weight: 600;
+  max-width: 680px;
+}
+
+/* ================================================================
+   SECTION HEADERS with color badges
+   ================================================================ */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.badge-blue  { background: rgba(56,189,248,0.15); color: var(--accent); }
+.badge-purple { background: rgba(129,140,248,0.15); color: var(--accent2); }
+.badge-green  { background: rgba(52,211,153,0.15); color: var(--green); }
+.badge-orange { background: rgba(251,146,60,0.15); color: var(--orange); }
+.badge-pink   { background: rgba(244,114,182,0.15); color: var(--pink); }
+.badge-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+.badge-teal   { background: rgba(45,212,191,0.15); color: var(--teal); }
+.badge-red    { background: rgba(248,113,113,0.15); color: var(--red); }
+.badge-cyan   { background: rgba(34,211,238,0.15); color: var(--cyan); }
+
+/* ================================================================
+   CARDS
+   ================================================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+.card-sm { padding: 20px; }
+.card-flush { padding: 0; overflow: hidden; }
+
+.card-header {
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* ================================================================
+   CODE BLOCKS
+   ================================================================ */
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px 24px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  margin-bottom: 20px;
+  color: #cbd5e1;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+p code, li code {
+  background: rgba(56,189,248,0.1);
+  border: 1px solid rgba(56,189,248,0.15);
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: var(--accent);
+  font-size: 0.85em;
+}
+
+.code-label {
+  display: inline-block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 6px 16px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+}
+.code-label + pre {
+  border-top-left-radius: 0;
+}
+
+/* YAML syntax highlighting (manually) */
+.hl-key { color: var(--accent); }
+.hl-str { color: var(--green); }
+.hl-num { color: var(--orange); }
+.hl-bool { color: var(--pink); }
+.hl-comment { color: var(--text-muted); font-style: italic; }
+.hl-section { color: var(--yellow); font-weight: 700; }
+
+/* ================================================================
+   DIAGRAMS (CSS-only)
+   ================================================================ */
+.diagram {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 36px 24px;
+  margin: 24px 0;
+  overflow-x: auto;
+}
+.diagram-label {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 16px;
+  font-style: italic;
+}
+
+/* Flowchart boxes */
+.flow-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.flow-box {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 22px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-align: center;
+  min-width: 140px;
+  line-height: 1.4;
+  border: 2px solid;
+  position: relative;
+}
+.flow-box small {
+  font-weight: 400;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+.flow-lead    { background: rgba(56,189,248,0.12); border-color: var(--accent); color: var(--accent); }
+.flow-coord   { background: rgba(129,140,248,0.12); border-color: var(--accent2); color: var(--accent2); }
+.flow-agent   { background: rgba(52,211,153,0.12); border-color: var(--green); color: var(--green); }
+.flow-twin-a  { background: rgba(251,146,60,0.12); border-color: var(--orange); color: var(--orange); }
+.flow-twin-b  { background: rgba(244,114,182,0.12); border-color: var(--pink); color: var(--pink); }
+.flow-phase   { background: rgba(251,191,36,0.08); border-color: var(--yellow); color: var(--yellow); min-width: 200px; }
+.flow-synth   { background: rgba(34,211,238,0.12); border-color: var(--cyan); color: var(--cyan); }
+
+.flow-arrow {
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+}
+.flow-arrow-down {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  margin: 4px 0;
+  user-select: none;
+}
+.flow-arrow-bidir {
+  color: var(--orange);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* ================================================================
+   COLLAPSIBLE SECTIONS
+   ================================================================ */
+.collapsible {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.collapsible-toggle {
+  width: 100%;
+  background: var(--bg-card);
+  border: none;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  transition: background 0.2s;
+}
+.collapsible-toggle:hover { background: var(--bg-card-alt); }
+.collapsible-toggle .chevron {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  transition: transform 0.3s;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.collapsible.open .collapsible-toggle .chevron {
+  transform: rotate(180deg);
+}
+.collapsible-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+.collapsible.open .collapsible-content {
+  max-height: 8000px;
+}
+.collapsible-body {
+  padding: 24px;
+  border-top: 1px solid var(--border);
+}
+
+/* ================================================================
+   PIPELINE / TIMELINE
+   ================================================================ */
+.pipeline {
+  position: relative;
+  padding-left: 40px;
+  margin: 28px 0;
+}
+.pipeline::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--accent), var(--accent2), var(--green), var(--orange));
+  border-radius: 2px;
+}
+.pipeline-step {
+  position: relative;
+  margin-bottom: 32px;
+}
+.pipeline-step:last-child { margin-bottom: 0; }
+.pipeline-dot {
+  position: absolute;
+  left: -33px;
+  top: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid;
+  background: var(--bg);
+}
+.pipeline-step:nth-child(1) .pipeline-dot { border-color: var(--accent); }
+.pipeline-step:nth-child(2) .pipeline-dot { border-color: var(--accent2); }
+.pipeline-step:nth-child(3) .pipeline-dot { border-color: var(--green); }
+.pipeline-step:nth-child(4) .pipeline-dot { border-color: var(--orange); }
+
+.pipeline-phase {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.pipeline-step:nth-child(1) .pipeline-phase { color: var(--accent); }
+.pipeline-step:nth-child(2) .pipeline-phase { color: var(--accent2); }
+.pipeline-step:nth-child(3) .pipeline-phase { color: var(--green); }
+.pipeline-step:nth-child(4) .pipeline-phase { color: var(--orange); }
+
+.pipeline-title { font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; }
+.pipeline-desc { color: var(--text-dim); font-size: 0.95rem; }
+
+/* ================================================================
+   TABLE
+   ================================================================ */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 0.92rem;
+}
+th {
+  text-align: left;
+  padding: 12px 16px;
+  background: var(--bg-code);
+  border-bottom: 2px solid var(--border);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+
+/* ================================================================
+   BADGES / TAGS
+   ================================================================ */
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.tag-blue   { color: var(--accent); border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.08); }
+.tag-purple { color: var(--accent2); border-color: rgba(129,140,248,0.3); background: rgba(129,140,248,0.08); }
+.tag-green  { color: var(--green); border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); }
+.tag-orange { color: var(--orange); border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.08); }
+.tag-pink   { color: var(--pink); border-color: rgba(244,114,182,0.3); background: rgba(244,114,182,0.08); }
+.tag-yellow { color: var(--yellow); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.08); }
+.tag-teal   { color: var(--teal); border-color: rgba(45,212,191,0.3); background: rgba(45,212,191,0.08); }
+.tag-red    { color: var(--red); border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
+
+/* ================================================================
+   LISTS
+   ================================================================ */
+ul, ol { padding-left: 24px; margin-bottom: 16px; }
+li { margin-bottom: 8px; }
+li::marker { color: var(--text-muted); }
+
+/* ================================================================
+   ALERT / CALLOUT
+   ================================================================ */
+.callout {
+  border-left: 4px solid;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.95rem;
+}
+.callout-info  { border-color: var(--accent); background: rgba(56,189,248,0.06); }
+.callout-warn  { border-color: var(--orange); background: rgba(251,146,60,0.06); }
+.callout-tip   { border-color: var(--green); background: rgba(52,211,153,0.06); }
+.callout-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.callout-info .callout-title  { color: var(--accent); }
+.callout-warn .callout-title  { color: var(--orange); }
+.callout-tip  .callout-title  { color: var(--green); }
+
+/* ================================================================
+   TWIN PAIR DIAGRAM
+   ================================================================ */
+.twin-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 20px;
+  flex-wrap: wrap;
+}
+.twin-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.twin-step-num {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.twin-connector {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2.2rem; }
+  .hero .subtitle { font-size: 1.05rem; }
+  h2 { font-size: 1.5rem; }
+  section { padding: 48px 0; }
+  .container { padding: 0 16px; }
+  .card { padding: 20px; }
+  pre { padding: 16px; font-size: 0.8rem; }
+  .flow-box { min-width: 110px; padding: 10px 14px; font-size: 0.8rem; }
+  nav a { font-size: 0.78rem; padding: 5px 10px; }
+  .card-grid { grid-template-columns: 1fr; }
+  table { font-size: 0.82rem; }
+  th, td { padding: 8px 10px; }
+}
+
+/* ================================================================
+   SCROLLBAR
+   ================================================================ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-glow); }
+
+/* ================================================================
+   SELECTION
+   ================================================================ */
+::selection { background: rgba(56,189,248,0.25); }
+
+/* ================================================================
+   PRINT
+   ================================================================ */
+@media print {
+  nav { display: none; }
+  body { background: white; color: #1e293b; }
+  .card { border: 1px solid #e2e8f0; box-shadow: none; }
+  pre { background: #f8fafc; border-color: #e2e8f0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAV
+     ============================================================ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#top" class="nav-brand">maz</a>
+    <a href="#concepts">Concepts</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#yaml">YAML Config</a>
+    <a href="#tutorial">Build Your Own</a>
+    <a href="#nukez-stack">Real Example</a>
+    <a href="#providers">API Keys</a>
+    <a href="#running">Running</a>
+    <a href="#cost">Cost</a>
+    <a href="#tips">Tips</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>multiagentz</h1>
+    <p class="subtitle">
+      A multi-agent orchestration framework that spins up teams of AI models
+      from a single YAML file. Define coordinator groups, assign models from
+      different providers, wire up twin pairs for cross-pollination debate,
+      and let the system synthesize answers that no single model could produce alone.
+    </p>
+    <div class="insight">
+      Core insight: Multiple AI models debating produces better answers than any single model.
+    </div>
+
+    <!-- Hero diagram -->
+    <div class="diagram" style="margin-top: 40px; max-width: 680px; margin-left: auto; margin-right: auto;">
+      <div class="flow-row">
+        <div class="flow-box flow-lead">LeadAgent<small>Opus 4.6 (Anthropic)</small></div>
+      </div>
+      <div class="flow-arrow-down" style="font-size:1.8rem;">&#8595;</div>
+      <div class="flow-row">
+        <div class="flow-box flow-coord">Coordinator A<small>Group Manager</small></div>
+        <div class="flow-box flow-coord">Coordinator B<small>Group Manager</small></div>
+        <div class="flow-box flow-coord">Coordinator C<small>Group Manager</small></div>
+      </div>
+      <div class="flow-arrow-down" style="font-size:1.8rem;">&#8595;</div>
+      <div class="flow-row" style="gap: 10px;">
+        <div class="flow-box flow-agent" style="min-width:80px; padding:8px 12px; font-size:0.78rem;">Agent</div>
+        <div class="flow-box flow-twin-a" style="min-width:80px; padding:8px 12px; font-size:0.78rem;">Twin A</div>
+        <div class="flow-box flow-twin-b" style="min-width:80px; padding:8px 12px; font-size:0.78rem;">Twin B</div>
+        <div class="flow-box flow-agent" style="min-width:80px; padding:8px 12px; font-size:0.78rem;">Agent</div>
+        <div class="flow-box flow-twin-a" style="min-width:80px; padding:8px 12px; font-size:0.78rem;">Twin A</div>
+        <div class="flow-box flow-twin-b" style="min-width:80px; padding:8px 12px; font-size:0.78rem;">Twin B</div>
+      </div>
+      <div class="diagram-label">Agent hierarchy: Lead routes to Coordinators, Coordinators manage Sub-Agent teams</div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     SECTION 1: CORE CONCEPTS
+     ============================================================ -->
+<section id="concepts">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-blue">1</span>
+      <h2>Core Concepts</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom: 32px;">
+      Every multiagentz stack is a tree of four agent types. Understanding these
+      four building blocks is all you need to design your own system.
+    </p>
+
+    <!-- LeadAgent -->
+    <div class="card" style="border-left: 4px solid var(--accent);">
+      <h3 style="color: var(--accent);">LeadAgent &mdash; The Brain</h3>
+      <p>
+        The top-level orchestrator. There is exactly one LeadAgent per stack. It
+        receives every user question, classifies it, routes it to the right
+        coordinator group(s), and synthesizes the final response. It also manages
+        orchestration modes (standard, consensus, perspective), caching, and
+        conversation memory.
+      </p>
+      <p style="margin-bottom: 0;">
+        In the YAML config, the <code>lead</code> section defines which model
+        powers the LeadAgent. This should be your most capable model &mdash; it
+        makes the routing decisions that determine everything downstream.
+      </p>
+    </div>
+
+    <!-- CoordinatorAgent -->
+    <div class="card" style="border-left: 4px solid var(--accent2);">
+      <h3 style="color: var(--accent2);">CoordinatorAgent &mdash; The Group Manager</h3>
+      <p>
+        A CoordinatorAgent owns a team of sub-agents. It receives questions from
+        the LeadAgent, routes them to the right sub-agent(s) within its group,
+        runs queries in parallel, and synthesizes multi-agent responses before
+        sending them back up.
+      </p>
+      <p style="margin-bottom: 0;">
+        Coordinators also manage cross-pollination: when a routed agent has a
+        twin, the coordinator automatically triggers the A/B debate loop instead
+        of a simple single-agent query. Think of coordinators as department
+        managers who know their team's specialties.
+      </p>
+    </div>
+
+    <!-- SubAgent -->
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <h3 style="color: var(--green);">SubAgent &mdash; The Worker</h3>
+      <p>
+        The leaf node. A SubAgent points at a specific repository path, reads
+        source files from it, and answers questions using an LLM with that
+        context. Each SubAgent has its own model, provider, description, and
+        list of <code>key_files</code> that define what it can see.
+      </p>
+      <p style="margin-bottom: 0;">
+        The <code>key_files</code> list is critical: it determines what context
+        the agent has. An agent that only sees <code>routes/</code> will reason
+        differently than one that sees <code>core/</code>. This deliberate
+        scoping is what makes multi-agent analysis powerful.
+      </p>
+    </div>
+
+    <!-- Twin Pairs -->
+    <div class="card" style="border-left: 4px solid var(--orange);">
+      <h3 style="color: var(--orange);">Twin Pairs &mdash; A/B Cross-Pollination</h3>
+      <p>
+        The secret weapon. Two sub-agents with different models analyze the same
+        question, swap their outputs, refine their answers incorporating the
+        counterpart's perspective, then a coordinator reconciles the two refined
+        outputs into a single authoritative answer.
+      </p>
+
+      <div class="diagram" style="margin: 24px 0 16px;">
+        <div class="twin-diagram">
+          <div class="twin-step">
+            <div class="twin-step-num">Step 1: Parallel</div>
+            <div class="flow-row" style="gap: 24px;">
+              <div class="flow-box flow-twin-a" style="min-width: 130px;">Twin A<small>e.g. Opus 4.6</small></div>
+              <div class="flow-box flow-twin-b" style="min-width: 130px;">Twin B<small>e.g. Grok 4.1</small></div>
+            </div>
+          </div>
+          <div class="twin-connector">&#8594;</div>
+          <div class="twin-step">
+            <div class="twin-step-num">Step 2: Swap</div>
+            <div class="flow-row" style="gap: 24px;">
+              <div class="flow-box flow-twin-a" style="min-width: 130px;">A reads B<small>reviews counterpart</small></div>
+              <div class="flow-box flow-twin-b" style="min-width: 130px;">B reads A<small>reviews counterpart</small></div>
+            </div>
+          </div>
+          <div class="twin-connector">&#8594;</div>
+          <div class="twin-step">
+            <div class="twin-step-num">Step 3: Refine</div>
+            <div class="flow-row" style="gap: 24px;">
+              <div class="flow-box flow-twin-a" style="min-width: 130px;">A refines<small>incorporates B's view</small></div>
+              <div class="flow-box flow-twin-b" style="min-width: 130px;">B refines<small>incorporates A's view</small></div>
+            </div>
+          </div>
+          <div class="twin-connector">&#8594;</div>
+          <div class="twin-step">
+            <div class="twin-step-num">Step 4: Reconcile</div>
+            <div class="flow-box flow-synth" style="min-width: 130px;">Coordinator<small>synthesizes final</small></div>
+          </div>
+        </div>
+        <div class="diagram-label">Cross-pollination loop: genuine cognitive diversity from different reasoning architectures</div>
+      </div>
+
+      <div class="callout callout-tip" style="margin-bottom: 0;">
+        <div class="callout-title">Why it works</div>
+        Using different models (e.g., Opus vs Grok) ensures genuine cognitive
+        diversity &mdash; different reasoning architectures, not just different
+        random seeds. Each model has different blind spots. The debate process
+        surfaces errors that either model alone would miss.
+      </div>
+    </div>
+
+    <!-- Orchestration Modes -->
+    <div class="card" style="border-left: 4px solid var(--yellow);">
+      <h3 style="color: var(--yellow);">Orchestration Modes</h3>
+      <div class="card-grid" style="margin-top: 16px;">
+        <div class="card card-sm" style="background: var(--bg-code);">
+          <h4><span class="tag tag-blue">standard</span></h4>
+          <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+            Simple routing. LeadAgent classifies the question, routes to the
+            right coordinator(s), gets answers, synthesizes. Fast and
+            cost-effective. Good for straightforward questions.
+          </p>
+        </div>
+        <div class="card card-sm" style="background: var(--bg-code);">
+          <h4><span class="tag tag-purple">consensus</span></h4>
+          <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+            Iterative conflict resolution. Routes to multiple agents, identifies
+            contradictions between their responses, generates refinement
+            questions, re-queries until agreement or max iterations. Good for
+            ambiguous technical questions.
+          </p>
+        </div>
+        <div class="card card-sm" style="background: var(--bg-code);">
+          <h4><span class="tag tag-orange">perspective</span></h4>
+          <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+            Full multi-phase orchestration. Each coordinator group becomes an
+            independent perspective that bootstraps context, generates a
+            solution, receives LEAD feedback, refines iteratively, then all
+            perspectives are synthesized. Best for complex design tasks.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: PERSPECTIVE PIPELINE
+     ============================================================ -->
+<section id="pipeline">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-purple">2</span>
+      <h2>The Perspective Orchestration Pipeline</h2>
+    </div>
+
+    <p style="color: var(--text-dim); margin-bottom: 32px;">
+      When orchestration mode is set to <code>perspective</code>, every question
+      triggers the full 4-phase pipeline. Each coordinator group operates as an
+      independent perspective, and the LEAD synthesizes their work into a
+      unified output.
+    </p>
+
+    <div class="pipeline">
+      <!-- Phase 1 -->
+      <div class="pipeline-step">
+        <div class="pipeline-dot"></div>
+        <div class="pipeline-phase">Phase 1</div>
+        <div class="pipeline-title">Bootstrap Q&A Alignment</div>
+        <div class="pipeline-desc">
+          Each perspective agent asks clarifying questions about the task.
+          The LeadAgent answers using its full routing capability (querying
+          other agents as needed). This continues up to 10 Q&A turns until
+          the perspective signals "ALIGNED" &mdash; meaning it has enough
+          context to generate an independent solution.
+        </div>
+        <div class="diagram" style="margin-top: 16px; padding: 20px;">
+          <div class="flow-row">
+            <div class="flow-box flow-coord" style="min-width: 120px;">Perspective<small>asks questions</small></div>
+            <div class="flow-arrow">&#8594;</div>
+            <div class="flow-box flow-lead" style="min-width: 120px;">LEAD<small>provides answers</small></div>
+            <div class="flow-arrow">&#8594;</div>
+            <div class="flow-box flow-coord" style="min-width: 120px;">Perspective<small>asks more</small></div>
+            <div class="flow-arrow">&#8594;</div>
+            <div class="flow-box flow-agent" style="min-width: 120px; border-color: var(--green); color: var(--green);">ALIGNED</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2 -->
+      <div class="pipeline-step">
+        <div class="pipeline-dot"></div>
+        <div class="pipeline-phase">Phase 2</div>
+        <div class="pipeline-title">Independent Solution Generation</div>
+        <div class="pipeline-desc">
+          Each perspective generates its complete proposed solution
+          independently. They produce overall approach and architecture,
+          implementation strategy, key design decisions, potential challenges,
+          and integration considerations. No perspective sees another's work
+          at this stage.
+        </div>
+        <div class="diagram" style="margin-top: 16px; padding: 20px;">
+          <div class="flow-row">
+            <div class="flow-box flow-coord" style="min-width: 130px;">pynukez<small>SDK solution</small></div>
+            <div class="flow-box flow-coord" style="min-width: 130px;">nukez_mcp<small>MCP solution</small></div>
+            <div class="flow-box flow-coord" style="min-width: 130px;">nukez<small>Backend solution</small></div>
+          </div>
+          <div class="diagram-label">Each group works in isolation, producing domain-expert proposals</div>
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div class="pipeline-step">
+        <div class="pipeline-dot"></div>
+        <div class="pipeline-phase">Phase 3</div>
+        <div class="pipeline-title">LEAD Review &amp; Iterative Refinement</div>
+        <div class="pipeline-desc">
+          The LeadAgent reviews all solutions, identifying strengths,
+          weaknesses, and required improvements for each. Perspectives
+          refine based on feedback. This cycle repeats up to
+          <code>max_iterations</code> times until the LEAD determines all
+          perspectives have converged (no further refinement needed).
+        </div>
+        <div class="diagram" style="margin-top: 16px; padding: 20px;">
+          <div class="flow-row">
+            <div class="flow-box flow-coord" style="min-width: 130px;">Solutions</div>
+            <div class="flow-arrow">&#8594;</div>
+            <div class="flow-box flow-lead" style="min-width: 130px;">LEAD Reviews<small>strengths + gaps</small></div>
+            <div class="flow-arrow">&#8594;</div>
+            <div class="flow-box flow-coord" style="min-width: 130px;">Perspectives Refine</div>
+            <div class="flow-arrow">&#8635;</div>
+          </div>
+          <div class="diagram-label">Iterates until convergence or max_iterations reached</div>
+        </div>
+      </div>
+
+      <!-- Phase 4 -->
+      <div class="pipeline-step">
+        <div class="pipeline-dot"></div>
+        <div class="pipeline-phase">Phase 4</div>
+        <div class="pipeline-title">Consensus Synthesis</div>
+        <div class="pipeline-desc">
+          The LeadAgent takes all converged solutions and synthesizes them
+          into a unified recommendation. The final output integrates the best
+          aspects of each perspective, explicitly notes where they diverged,
+          explains the rationale, and provides an actionable implementation plan.
+        </div>
+        <div class="diagram" style="margin-top: 16px; padding: 20px;">
+          <div class="flow-row">
+            <div class="flow-box flow-coord" style="min-width: 100px;">Solution A</div>
+            <div class="flow-box flow-coord" style="min-width: 100px;">Solution B</div>
+            <div class="flow-box flow-coord" style="min-width: 100px;">Solution C</div>
+            <div class="flow-arrow">&#8594;</div>
+            <div class="flow-box flow-synth" style="min-width: 160px;">Unified Output<small>best of all perspectives</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: YAML CONFIGURATION
+     ============================================================ -->
+<section id="yaml">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-green">3</span>
+      <h2>The YAML Configuration</h2>
+    </div>
+
+    <p style="color: var(--text-dim); margin-bottom: 12px;">
+      The YAML file is the only thing you edit. It defines your entire agent
+      stack: which models to use, how to organize them, what files they see,
+      and how they debate. Every field is explained below.
+    </p>
+
+    <div class="callout callout-info" style="margin-bottom: 32px;">
+      <div class="callout-title">One file, complete control</div>
+      You do not write any Python code. The YAML config declares everything.
+      The framework reads it and builds the agent tree automatically.
+    </div>
+
+    <!-- Schema walkthrough -->
+    <div class="collapsible open">
+      <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+        <span>Stack Name &amp; Orchestration Settings</span>
+        <span class="chevron">&#9660;</span>
+      </button>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<div class="code-label">stack.yaml -- Top-level fields</div>
+<pre><span class="hl-key">name</span>: <span class="hl-str">my-analysis-stack</span>           <span class="hl-comment"># Human-readable stack name</span>
+
+<span class="hl-key">orchestration</span>:
+  <span class="hl-key">mode</span>: <span class="hl-str">perspective</span>               <span class="hl-comment"># standard | consensus | perspective</span>
+  <span class="hl-key">max_iterations</span>: <span class="hl-num">5</span>              <span class="hl-comment"># Refinement cycles before stopping</span>
+  <span class="hl-key">cross_pollination</span>: <span class="hl-bool">true</span>        <span class="hl-comment"># Enable A/B twin debate loops</span></pre>
+          <ul>
+            <li><code>name</code> &mdash; Shows up in terminal output, logs, and exported HTML files.</li>
+            <li><code>orchestration.mode</code> &mdash; Choose <code>standard</code> for simple routing, <code>consensus</code> for iterative conflict resolution, or <code>perspective</code> for the full 4-phase pipeline.</li>
+            <li><code>max_iterations</code> &mdash; How many refinement rounds before the system stops. Higher = better quality but more expensive. Start with 3&ndash;5.</li>
+            <li><code>cross_pollination</code> &mdash; When <code>true</code>, any agent with a <code>twin</code> field will automatically trigger the A/B debate loop.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+        <span>Lead Configuration</span>
+        <span class="chevron">&#9660;</span>
+      </button>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<div class="code-label">stack.yaml -- lead section</div>
+<pre><span class="hl-key">lead</span>:
+  <span class="hl-key">model</span>: <span class="hl-str">claude-opus-4-6</span>            <span class="hl-comment"># The model powering your LeadAgent</span>
+  <span class="hl-key">provider</span>: <span class="hl-str">anthropic</span>              <span class="hl-comment"># anthropic, openai, xai, google, etc.</span>
+
+  <span class="hl-key">routing_prompt_extra</span>: <span class="hl-str">|</span>
+    <span class="hl-str">Description of your system and how to route questions.</span>
+    <span class="hl-str">Which coordinator handles what. Cross-cutting rules.</span>
+    <span class="hl-str">This is the most important text in your entire config.</span>
+
+  <span class="hl-key">keywords</span>:                         <span class="hl-comment"># Fast pre-route hints (before LLM)</span>
+    <span class="hl-key">coordinator_a</span>:
+      - <span class="hl-str">sdk</span>
+      - <span class="hl-str">client</span>
+      - <span class="hl-str">library</span>
+    <span class="hl-key">coordinator_b</span>:
+      - <span class="hl-str">backend</span>
+      - <span class="hl-str">server</span>
+      - <span class="hl-str">api</span></pre>
+          <ul>
+            <li><code>model</code> + <code>provider</code> &mdash; Use your strongest model here. The Lead makes routing decisions that determine everything downstream.</li>
+            <li><code>routing_prompt_extra</code> &mdash; Free-form text injected into the routing classifier prompt. Describe what each coordinator group handles and any cross-cutting rules. This is the single most important thing to get right.</li>
+            <li><code>keywords</code> &mdash; Fast keyword matching that bypasses the LLM entirely. If a question contains "sdk", it routes directly to coordinator_a without an LLM call. Saves time and money for obvious routing.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+        <span>Coordinator Groups &amp; Sub-Agents</span>
+        <span class="chevron">&#9660;</span>
+      </button>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<div class="code-label">stack.yaml -- agents section (nested inside lead)</div>
+<pre><span class="hl-key">  agents</span>:
+    <span class="hl-section">my_group</span>:                       <span class="hl-comment"># Coordinator group name</span>
+      <span class="hl-key">type</span>: <span class="hl-str">coordinator</span>
+      <span class="hl-key">max_workers</span>: <span class="hl-num">8</span>                 <span class="hl-comment"># Thread pool for parallel queries</span>
+      <span class="hl-key">description</span>: <span class="hl-str">&gt;</span>
+        <span class="hl-str">What this coordinator group covers.</span>
+        <span class="hl-str">Used by the Lead for routing decisions.</span>
+      <span class="hl-key">routing_prompt_extra</span>: <span class="hl-str">|</span>
+        <span class="hl-str">How to route within this group.</span>
+        <span class="hl-str">Which sub-agent handles what.</span>
+
+      <span class="hl-key">agents</span>:                          <span class="hl-comment"># Sub-agents within this group</span>
+        <span class="hl-section">Agent_Root</span>:
+          <span class="hl-key">repo_path</span>: <span class="hl-str">/path/to/repo</span>
+          <span class="hl-key">model</span>: <span class="hl-str">claude-sonnet-4-20250514</span>
+          <span class="hl-key">provider</span>: <span class="hl-str">anthropic</span>
+          <span class="hl-key">description</span>: <span class="hl-str">&gt;</span>
+            <span class="hl-str">What files and topics this agent covers.</span>
+          <span class="hl-key">key_files</span>:
+            - <span class="hl-str">README.md</span>
+            - <span class="hl-str">pyproject.toml</span>
+            - <span class="hl-str">docs/</span></pre>
+          <ul>
+            <li><code>type: coordinator</code> &mdash; Marks this as a group manager, not a leaf agent.</li>
+            <li><code>description</code> &mdash; The Lead reads this to decide which coordinator to route to. Be specific and comprehensive.</li>
+            <li><code>routing_prompt_extra</code> &mdash; The coordinator reads this to decide which sub-agent to route to within its group.</li>
+            <li><code>repo_path</code> &mdash; Absolute path to the directory this agent reads files from.</li>
+            <li><code>key_files</code> &mdash; List of files and directories the agent can see. Directories (ending with <code>/</code>) include all files within them.</li>
+            <li><code>model</code> + <code>provider</code> &mdash; Each sub-agent can use a different model. This is how you get model diversity.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <button class="collapsible-toggle" onclick="toggleCollapsible(this)">
+        <span>Twin Pairs &amp; Cross-Pollination Config</span>
+        <span class="chevron">&#9660;</span>
+      </button>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<div class="code-label">stack.yaml -- Twin pair pattern</div>
+<pre>      <span class="hl-key">agents</span>:
+        <span class="hl-section">Core_A</span>:
+          <span class="hl-key">repo_path</span>: <span class="hl-str">/path/to/core</span>
+          <span class="hl-key">model</span>: <span class="hl-str">claude-opus-4-6</span>        <span class="hl-comment"># Model A: Anthropic</span>
+          <span class="hl-key">provider</span>: <span class="hl-str">anthropic</span>
+          <span class="hl-key">description</span>: <span class="hl-str">&gt;</span>
+            <span class="hl-str">Core business logic.</span>
+          <span class="hl-key">key_files</span>:
+            - <span class="hl-str">__init__.py</span>
+            - <span class="hl-str">payments.py</span>
+            - <span class="hl-str">storage.py</span>
+          <span class="hl-key">twin</span>: <span class="hl-str">Core_B</span>                  <span class="hl-comment"># Links to its twin</span>
+
+        <span class="hl-section">Core_B</span>:
+          <span class="hl-key">repo_path</span>: <span class="hl-str">/path/to/core</span>       <span class="hl-comment"># SAME repo path as A</span>
+          <span class="hl-key">model</span>: <span class="hl-str">grok-4-1-fast-reasoning</span> <span class="hl-comment"># Model B: xAI (different!)</span>
+          <span class="hl-key">provider</span>: <span class="hl-str">xai</span>
+          <span class="hl-key">description</span>: <span class="hl-str">&gt;</span>
+            <span class="hl-str">Core business logic.</span>        <span class="hl-comment"># Same description as A</span>
+          <span class="hl-key">key_files</span>:                    <span class="hl-comment"># Same key_files as A</span>
+            - <span class="hl-str">__init__.py</span>
+            - <span class="hl-str">payments.py</span>
+            - <span class="hl-str">storage.py</span>
+          <span class="hl-key">twin</span>: <span class="hl-str">Core_A</span>                  <span class="hl-comment"># Links back (bidirectional)</span></pre>
+          <div class="callout callout-warn" style="margin-bottom: 12px;">
+            <div class="callout-title">Key rules for twin pairs</div>
+            <ul style="margin-bottom: 0;">
+              <li>Both twins must have the <code>twin</code> field pointing at each other.</li>
+              <li>They should point at the <strong>same repo_path</strong> and have the <strong>same key_files</strong>.</li>
+              <li>They should have <strong>different models</strong> (ideally different providers) for genuine cognitive diversity.</li>
+              <li>Their descriptions should be identical &mdash; the coordinator needs to see them as interchangeable.</li>
+              <li>The top-level <code>cross_pollination: true</code> must be set for twins to activate.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: BUILD YOUR OWN
+     ============================================================ -->
+<section id="tutorial">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-orange">4</span>
+      <h2>Building Your Own Stack</h2>
+    </div>
+
+    <p style="color: var(--text-dim); margin-bottom: 8px;">
+      Let us walk through creating a stack from scratch. The example use case:
+      analyzing a legal contract from multiple expert perspectives.
+    </p>
+
+    <div class="callout callout-info" style="margin-bottom: 32px;">
+      <div class="callout-title">Scenario</div>
+      You have a SaaS company with three concerns: legal compliance, technical
+      architecture, and business strategy. You want AI agents specialized in
+      each area to analyze a contract, debate their findings, and produce a
+      unified recommendation.
+    </div>
+
+    <!-- Step 1 -->
+    <div class="card">
+      <h3>Step 1 &mdash; Define Your Coordinator Groups</h3>
+      <p>Think about the distinct domains of expertise. Each domain becomes a coordinator group.</p>
+<div class="code-label">stacks/contract_review.yaml</div>
+<pre><span class="hl-key">name</span>: <span class="hl-str">contract-review</span>
+
+<span class="hl-key">orchestration</span>:
+  <span class="hl-key">mode</span>: <span class="hl-str">perspective</span>
+  <span class="hl-key">max_iterations</span>: <span class="hl-num">3</span>
+  <span class="hl-key">cross_pollination</span>: <span class="hl-bool">true</span>
+
+<span class="hl-key">lead</span>:
+  <span class="hl-key">model</span>: <span class="hl-str">claude-opus-4-6</span>
+  <span class="hl-key">provider</span>: <span class="hl-str">anthropic</span>
+  <span class="hl-key">routing_prompt_extra</span>: <span class="hl-str">|</span>
+    <span class="hl-str">Three analysis groups:</span>
+    <span class="hl-str">- **legal**: Regulatory compliance, liability, IP clauses</span>
+    <span class="hl-str">- **technical**: Architecture impact, integration requirements</span>
+    <span class="hl-str">- **business**: Financial terms, competitive positioning, risk</span>
+
+  <span class="hl-key">keywords</span>:
+    <span class="hl-key">legal</span>:
+      - <span class="hl-str">compliance</span>
+      - <span class="hl-str">liability</span>
+      - <span class="hl-str">regulation</span>
+    <span class="hl-key">technical</span>:
+      - <span class="hl-str">api</span>
+      - <span class="hl-str">integration</span>
+      - <span class="hl-str">architecture</span>
+    <span class="hl-key">business</span>:
+      - <span class="hl-str">pricing</span>
+      - <span class="hl-str">revenue</span>
+      - <span class="hl-str">competition</span></pre>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="card">
+      <h3>Step 2 &mdash; Define Sub-Agents Within Each Group</h3>
+      <p>
+        Each coordinator group gets sub-agents. Point them at the relevant files.
+        For contract review, each agent reads the contract plus domain-specific reference materials.
+      </p>
+<div class="code-label">stacks/contract_review.yaml -- agents section</div>
+<pre>  <span class="hl-key">agents</span>:
+    <span class="hl-section">legal</span>:
+      <span class="hl-key">type</span>: <span class="hl-str">coordinator</span>
+      <span class="hl-key">description</span>: <span class="hl-str">Legal compliance and regulatory analysis</span>
+      <span class="hl-key">agents</span>:
+        <span class="hl-section">Legal_A</span>:
+          <span class="hl-key">repo_path</span>: <span class="hl-str">/path/to/contracts</span>
+          <span class="hl-key">model</span>: <span class="hl-str">claude-opus-4-6</span>
+          <span class="hl-key">provider</span>: <span class="hl-str">anthropic</span>
+          <span class="hl-key">description</span>: <span class="hl-str">Legal analysis of contract terms</span>
+          <span class="hl-key">key_files</span>:
+            - <span class="hl-str">contract.pdf</span>
+            - <span class="hl-str">compliance_checklist.md</span>
+          <span class="hl-key">twin</span>: <span class="hl-str">Legal_B</span>
+
+        <span class="hl-section">Legal_B</span>:
+          <span class="hl-key">repo_path</span>: <span class="hl-str">/path/to/contracts</span>
+          <span class="hl-key">model</span>: <span class="hl-str">o4-mini</span>
+          <span class="hl-key">provider</span>: <span class="hl-str">openai</span>
+          <span class="hl-key">description</span>: <span class="hl-str">Legal analysis of contract terms</span>
+          <span class="hl-key">key_files</span>:
+            - <span class="hl-str">contract.pdf</span>
+            - <span class="hl-str">compliance_checklist.md</span>
+          <span class="hl-key">twin</span>: <span class="hl-str">Legal_A</span></pre>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="card">
+      <h3>Step 3 &mdash; Set Up Twin Pairs for Cognitive Diversity</h3>
+      <p>
+        For each twin pair, use different models and ideally different providers.
+        This ensures the debate involves genuinely different reasoning architectures.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Twin Pair</th><th>Model A</th><th>Model B</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Legal A / B</td>
+            <td><span class="tag tag-blue">Opus 4.6</span></td>
+            <td><span class="tag tag-green">o4-mini</span></td>
+            <td>Deep vs. fast reasoning for legal nuance</td>
+          </tr>
+          <tr>
+            <td>Tech A / B</td>
+            <td><span class="tag tag-blue">Opus 4.6</span></td>
+            <td><span class="tag tag-orange">Grok 4.1</span></td>
+            <td>Different architectures catch different edge cases</td>
+          </tr>
+          <tr>
+            <td>Biz A / B</td>
+            <td><span class="tag tag-purple">Sonnet 4</span></td>
+            <td><span class="tag tag-yellow">Gemini Flash</span></td>
+            <td>Cost-effective for business analysis layer</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="card">
+      <h3>Step 4 &mdash; Write Routing Instructions</h3>
+      <p>
+        The <code>routing_prompt_extra</code> on the lead is the most
+        important text in your config. Be explicit about what each group handles
+        and when to route to multiple groups.
+      </p>
+      <div class="callout callout-tip" style="margin-bottom: 0;">
+        <div class="callout-title">Good routing instructions</div>
+        <ul style="margin-bottom: 0;">
+          <li>Name each coordinator and list its scope</li>
+          <li>Define cross-cutting rules ("if question mentions both X and Y, route to both")</li>
+          <li>Specify default routing for ambiguous questions</li>
+          <li>Include example questions and where they should go</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="card">
+      <h3>Step 5 &mdash; Choose Orchestration Mode</h3>
+      <table>
+        <thead>
+          <tr><th>Use Case</th><th>Recommended Mode</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Quick factual lookups</td><td><span class="tag tag-blue">standard</span></td><td>Fast, cheap, one routing hop</td></tr>
+          <tr><td>Ambiguous technical questions</td><td><span class="tag tag-purple">consensus</span></td><td>Identifies contradictions, resolves them</td></tr>
+          <tr><td>Complex design / architecture tasks</td><td><span class="tag tag-orange">perspective</span></td><td>Full multi-phase, highest quality</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="card">
+      <h3>Step 6 &mdash; Run It</h3>
+<pre style="margin-bottom:0;">maz --config ./stacks/contract_review.yaml</pre>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: NUKEZ STACK (real example)
+     ============================================================ -->
+<section id="nukez-stack">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-pink">5</span>
+      <h2>Real-World Example: The Nukez Stack</h2>
+    </div>
+
+    <p style="color: var(--text-dim); margin-bottom: 32px;">
+      The <code>compression_buildout.yaml</code> stack is a production
+      configuration analyzing the Nukez cryptographic storage infrastructure &mdash;
+      a system spanning a Python SDK, an MCP server bridge, and a FastAPI backend.
+      It uses 14 agents across 3 coordinator groups, 5 twin pairs, 6 different
+      models, and 4 providers.
+    </p>
+
+    <!-- Visual map -->
+    <div class="diagram">
+      <div class="flow-row">
+        <div class="flow-box flow-lead" style="min-width: 200px;">
+          LeadAgent<small>claude-opus-4-6 (Anthropic)</small>
+        </div>
+      </div>
+      <div class="flow-arrow-down" style="font-size: 2rem;">&#8595;</div>
+      <div class="flow-row" style="gap: 24px; align-items: flex-start;">
+        <!-- pynukez group -->
+        <div style="text-align: center;">
+          <div class="flow-box flow-coord" style="min-width: 180px; margin-bottom: 12px;">
+            pynukez<small>Python SDK (3 agents)</small>
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+            <div class="flow-box flow-agent" style="min-width: 80px; padding: 6px 10px; font-size: 0.72rem;">Root<small>Opus 4.5</small></div>
+            <div class="flow-box flow-twin-a" style="min-width: 80px; padding: 6px 10px; font-size: 0.72rem;">PyA<small>Opus 4.5</small></div>
+            <div class="flow-box flow-twin-b" style="min-width: 80px; padding: 6px 10px; font-size: 0.72rem;">PyB<small>Opus 4.6</small></div>
+          </div>
+        </div>
+        <!-- nukez_mcp group -->
+        <div style="text-align: center;">
+          <div class="flow-box flow-coord" style="min-width: 180px; margin-bottom: 12px;">
+            nukez_mcp<small>MCP Bridge (2 agents)</small>
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+            <div class="flow-box flow-agent" style="min-width: 80px; padding: 6px 10px; font-size: 0.72rem;">MCP Root<small>Grok 4.1</small></div>
+            <div class="flow-box flow-agent" style="min-width: 80px; padding: 6px 10px; font-size: 0.72rem;">MCP Server<small>Grok 4.1</small></div>
+          </div>
+        </div>
+        <!-- nukez group -->
+        <div style="text-align: center;">
+          <div class="flow-box flow-coord" style="min-width: 180px; margin-bottom: 12px;">
+            nukez<small>Backend Gateway (9 agents)</small>
+          </div>
+          <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; max-width: 400px;">
+            <div class="flow-box flow-twin-a" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">RootA<small>Sonnet</small></div>
+            <div class="flow-box flow-twin-b" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">RootB<small>Sonnet</small></div>
+            <div class="flow-box flow-twin-a" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">DocsA<small>o4-mini</small></div>
+            <div class="flow-box flow-twin-b" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">DocsB<small>o4-mini</small></div>
+            <div class="flow-box flow-twin-a" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">CoreA<small>Opus 4.6</small></div>
+            <div class="flow-box flow-twin-b" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">CoreB<small>Grok 4.1</small></div>
+            <div class="flow-box flow-twin-a" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">RoutesA<small>Opus 4.6</small></div>
+            <div class="flow-box flow-twin-b" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">RoutesB<small>Opus 4.5</small></div>
+            <div class="flow-box flow-agent" style="min-width: 60px; padding: 4px 8px; font-size: 0.68rem;">Switch<small>Gemini</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="diagram-label">Nukez compression-buildout stack: 3 coordinator groups, 14 agents, 5 twin pairs</div>
+    </div>
+
+    <!-- Twin pairs table -->
+    <h3 style="margin-top: 32px; margin-bottom: 16px;">Cross-Pollination Twin Pairs</h3>
+    <div class="card card-flush">
+      <table>
+        <thead>
+          <tr><th>Pair</th><th>Twin A</th><th>Model A</th><th>Twin B</th><th>Model B</th><th>Provider Mix</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight: 600;">PyA / PyB</td>
+            <td>Pynukez_PyA</td>
+            <td><span class="tag tag-blue">claude-opus-4-5</span></td>
+            <td>Pynukez_PyB</td>
+            <td><span class="tag tag-blue">claude-opus-4-6</span></td>
+            <td><span class="tag tag-blue">Anthropic</span> / <span class="tag tag-blue">Anthropic</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">RootA / RootB</td>
+            <td>Nukez_RootA</td>
+            <td><span class="tag tag-purple">claude-sonnet-4</span></td>
+            <td>Nukez_RootB</td>
+            <td><span class="tag tag-purple">claude-sonnet-4</span></td>
+            <td><span class="tag tag-blue">Anthropic</span> / <span class="tag tag-blue">Anthropic</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">DocsA / DocsB</td>
+            <td>Nukez_DocsA</td>
+            <td><span class="tag tag-green">o4-mini</span></td>
+            <td>Nukez_DocsB</td>
+            <td><span class="tag tag-green">o4-mini</span></td>
+            <td><span class="tag tag-green">OpenAI</span> / <span class="tag tag-green">OpenAI</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">CoreA / CoreB</td>
+            <td>Nukez_CoreA</td>
+            <td><span class="tag tag-blue">claude-opus-4-6</span></td>
+            <td>Nukez_CoreB</td>
+            <td><span class="tag tag-orange">grok-4-1</span></td>
+            <td><span class="tag tag-blue">Anthropic</span> / <span class="tag tag-orange">xAI</span></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600;">RoutesA / RoutesB</td>
+            <td>Nukez_RoutesA</td>
+            <td><span class="tag tag-blue">claude-opus-4-6</span></td>
+            <td>Nukez_RoutesB</td>
+            <td><span class="tag tag-blue">claude-opus-4-5</span></td>
+            <td><span class="tag tag-blue">Anthropic</span> / <span class="tag tag-blue">Anthropic</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Model inventory -->
+    <h3 style="margin-top: 32px; margin-bottom: 16px;">Model &amp; Provider Inventory</h3>
+    <div class="card-grid">
+      <div class="card card-sm" style="background: var(--bg-code);">
+        <h4 style="color: var(--accent);">6 Models</h4>
+        <ul style="margin: 0; list-style: none; padding: 0;">
+          <li style="padding: 4px 0;"><span class="tag tag-blue">claude-opus-4-6</span> &mdash; Lead + CoreA + RoutesA</li>
+          <li style="padding: 4px 0;"><span class="tag tag-blue">claude-opus-4-5</span> &mdash; Root + PyA + RoutesB</li>
+          <li style="padding: 4px 0;"><span class="tag tag-purple">claude-sonnet-4</span> &mdash; RootA + RootB</li>
+          <li style="padding: 4px 0;"><span class="tag tag-orange">grok-4-1-fast</span> &mdash; MCP Root + MCP Server + CoreB</li>
+          <li style="padding: 4px 0;"><span class="tag tag-green">o4-mini</span> &mdash; DocsA + DocsB</li>
+          <li style="padding: 4px 0;"><span class="tag tag-yellow">gemini-2.0-flash</span> &mdash; Switch</li>
+        </ul>
+      </div>
+      <div class="card card-sm" style="background: var(--bg-code);">
+        <h4 style="color: var(--accent2);">4 Providers</h4>
+        <ul style="margin: 0; list-style: none; padding: 0;">
+          <li style="padding: 6px 0;"><span class="tag tag-blue">Anthropic</span> &mdash; Claude models</li>
+          <li style="padding: 6px 0;"><span class="tag tag-orange">xAI</span> &mdash; Grok models</li>
+          <li style="padding: 6px 0;"><span class="tag tag-green">OpenAI</span> &mdash; o4-mini</li>
+          <li style="padding: 6px 0;"><span class="tag tag-yellow">Google</span> &mdash; Gemini Flash</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: API KEY SETUP
+     ============================================================ -->
+<section id="providers">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-teal">6</span>
+      <h2>API Key Setup</h2>
+    </div>
+
+    <p style="color: var(--text-dim); margin-bottom: 12px;">
+      API keys are loaded from environment variables via a <code>.env</code> file
+      in your project root. Each provider has its own variable. You only need keys
+      for the providers you actually use in your stack.
+    </p>
+
+<div class="code-label">.env</div>
+<pre><span class="hl-comment"># Anthropic (Claude models)</span>
+<span class="hl-key">ANTHROPIC_API_KEY</span>=<span class="hl-str">sk-ant-...</span>
+
+<span class="hl-comment"># OpenAI (GPT, o4-mini, etc.)</span>
+<span class="hl-key">OPENAI_API_KEY</span>=<span class="hl-str">sk-...</span>
+
+<span class="hl-comment"># xAI (Grok models)</span>
+<span class="hl-key">XAI_API_KEY</span>=<span class="hl-str">xai-...</span>
+
+<span class="hl-comment"># Google (Gemini models)</span>
+<span class="hl-key">GOOGLE_API_KEY</span>=<span class="hl-str">AIza...</span>
+
+<span class="hl-comment"># Mistral (optional)</span>
+<span class="hl-key">MISTRAL_API_KEY</span>=<span class="hl-str">...</span>
+
+<span class="hl-comment"># Cohere (optional)</span>
+<span class="hl-key">COHERE_API_KEY</span>=<span class="hl-str">...</span>
+
+<span class="hl-comment"># NVIDIA (optional)</span>
+<span class="hl-key">NVIDIA_API_KEY</span>=<span class="hl-str">nvapi-...</span>
+
+<span class="hl-comment"># Ollama (local, no key needed)</span>
+<span class="hl-comment"># OLLAMA_BASE_URL=http://localhost:11434/v1</span></pre>
+
+    <h3 style="margin-top: 28px; margin-bottom: 16px;">Where to Get Keys</h3>
+    <div class="card card-flush">
+      <table>
+        <thead>
+          <tr><th>Provider</th><th>Console URL</th><th>Env Variable</th><th>Models</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Anthropic</strong></td>
+            <td>console.anthropic.com</td>
+            <td><code>ANTHROPIC_API_KEY</code></td>
+            <td>Claude Opus, Sonnet</td>
+          </tr>
+          <tr>
+            <td><strong>OpenAI</strong></td>
+            <td>platform.openai.com</td>
+            <td><code>OPENAI_API_KEY</code></td>
+            <td>GPT-4o, o4-mini</td>
+          </tr>
+          <tr>
+            <td><strong>xAI</strong></td>
+            <td>console.x.ai</td>
+            <td><code>XAI_API_KEY</code></td>
+            <td>Grok 4.1</td>
+          </tr>
+          <tr>
+            <td><strong>Google</strong></td>
+            <td>aistudio.google.com</td>
+            <td><code>GOOGLE_API_KEY</code></td>
+            <td>Gemini 2.0 Flash</td>
+          </tr>
+          <tr>
+            <td><strong>Mistral</strong></td>
+            <td>console.mistral.ai</td>
+            <td><code>MISTRAL_API_KEY</code></td>
+            <td>Mistral Large</td>
+          </tr>
+          <tr>
+            <td><strong>Ollama</strong></td>
+            <td>ollama.com (local)</td>
+            <td><code>OLLAMA_BASE_URL</code></td>
+            <td>Llama, Qwen, etc.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-tip" style="margin-top: 20px;">
+      <div class="callout-title">Automatic provider detection</div>
+      You do not need to specify base URLs for most providers. The framework
+      infers the provider from the model name: <code>claude-*</code> maps to
+      Anthropic, <code>grok-*</code> maps to xAI, <code>gemini-*</code> maps to
+      Google, and so on. Just set the API key and use the model name in your YAML.
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: RUNNING THE SYSTEM
+     ============================================================ -->
+<section id="running">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-yellow">7</span>
+      <h2>Running the System</h2>
+    </div>
+
+    <h3 style="margin-bottom: 16px;">Installation</h3>
+<pre>pip install multiagentz[all]
+
+<span class="hl-comment"># Or with specific providers only:</span>
+pip install multiagentz[anthropic]
+pip install multiagentz[openai]</pre>
+
+    <h3 style="margin-top: 28px; margin-bottom: 16px;">Launch</h3>
+<pre>maz --config ./stacks/your_stack.yaml</pre>
+
+    <p>
+      This starts an interactive REPL. You type questions, the system routes
+      them through your agent hierarchy, and you see the synthesized response
+      in the terminal. Every response is also automatically exported to an HTML
+      file in the <code>./outputs/</code> directory.
+    </p>
+
+    <h3 style="margin-top: 28px; margin-bottom: 16px;">Available Commands</h3>
+    <div class="card card-flush">
+      <table>
+        <thead>
+          <tr><th style="width: 220px;">Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/help</code></td><td>Show all available commands</td></tr>
+          <tr><td><code>/perspective "question"</code></td><td>Force perspective mode for a specific question (bypasses default mode)</td></tr>
+          <tr><td><code>/consensus question</code></td><td>Force consensus mode for a specific question</td></tr>
+          <tr><td><code>/export [html|md|svg|txt]</code></td><td>Re-export the last response in a different format</td></tr>
+          <tr><td><code>/status</code></td><td>Show orchestration configuration and current state</td></tr>
+          <tr><td><code>/promote agent_name</code></td><td>Promote an agent to LEAD_SUB (primary implementation coordinator)</td></tr>
+          <tr><td><code>/demote</code></td><td>Remove LEAD_SUB promotion</td></tr>
+          <tr><td><code>/watch /path/to/dir</code></td><td>Add a directory to the files agent watch list</td></tr>
+          <tr><td><code>/scan /path/to/project</code></td><td>Quick scan and summary of a project directory</td></tr>
+          <tr><td><code>/file /path/to/file.txt</code></td><td>Load a file as the question input</td></tr>
+          <tr><td><code>/paste</code></td><td>Enter multi-line paste mode (type END to finish)</td></tr>
+          <tr><td><code>/brief</code></td><td>Toggle brief mode (shorter responses)</td></tr>
+          <tr><td><code>/cache</code></td><td>Show cache statistics</td></tr>
+          <tr><td><code>/cache clear</code></td><td>Clear the response cache</td></tr>
+          <tr><td><code>/clear</code></td><td>Clear conversation memory</td></tr>
+          <tr><td><code>quit</code></td><td>Exit the REPL</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top: 28px; margin-bottom: 16px;">Understanding Terminal Output</h3>
+    <p>While the system processes your question, you will see routing logs in the terminal:</p>
+<pre><span class="hl-comment">[compression-buildout] Pre-route hint: nukez</span>
+<span class="hl-comment">[compression-buildout] Routing to: ['nukez']</span>
+<span class="hl-comment">[compression-buildout] Querying nukez...</span>
+<span class="hl-comment">  [nukez] Routing: Routes question about endpoint...</span>
+<span class="hl-comment">  [nukez] Cross-pollination: Nukez_RoutesA &lt;-&gt; Nukez_RoutesB</span>
+<span class="hl-comment">  [nukez] Cross-pollination iteration 1: swapping outputs</span>
+<span class="hl-comment">  [nukez] Cross-pollination: reconciling outputs</span></pre>
+    <p>
+      Each indentation level shows a different layer of the hierarchy.
+      The top level is the LeadAgent, the second level is the coordinator, and
+      the third level is the cross-pollination engine. This lets you see exactly
+      how your question flows through the system.
+    </p>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: COST AWARENESS
+     ============================================================ -->
+<section id="cost">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-red">8</span>
+      <h2>Cost Awareness</h2>
+    </div>
+
+    <p style="color: var(--text-dim); margin-bottom: 24px;">
+      Multi-agent systems use significantly more tokens than a single model.
+      Understanding the cost multipliers helps you design stacks that balance
+      quality against budget.
+    </p>
+
+    <div class="card-grid">
+      <div class="card card-sm" style="border-left: 4px solid var(--red);">
+        <h4 style="color: var(--red);">Cost Multipliers</h4>
+        <ul>
+          <li><strong>Context size:</strong> Each agent ingests its <code>key_files</code> as context. Larger files = more input tokens per query.</li>
+          <li><strong>Agent count:</strong> A question routed to 3 agents uses 3x the tokens of a single-agent query.</li>
+          <li><strong>Cross-pollination:</strong> Twin pairs roughly double the per-cycle cost (parallel generation + swap/refine + reconciliation).</li>
+          <li><strong>Iterations:</strong> Perspective mode with <code>max_iterations: 5</code> can run up to 5 refinement cycles per perspective.</li>
+          <li><strong>Bootstrap Q&A:</strong> Each Q&A turn in Phase 1 involves both perspective agents and the LEAD.</li>
+        </ul>
+      </div>
+      <div class="card card-sm" style="border-left: 4px solid var(--green);">
+        <h4 style="color: var(--green);">Cost Optimization</h4>
+        <ul>
+          <li><strong>Start with <code>max_iterations: 3</code></strong> and only increase if quality is insufficient.</li>
+          <li><strong>Use cheaper models for non-critical agents.</strong> Root/config agents that read READMEs and pyproject.toml files do not need Opus. Use Sonnet or Gemini Flash.</li>
+          <li><strong>Reserve Opus for core logic agents</strong> where deep reasoning matters (complex business logic, security analysis).</li>
+          <li><strong>Use <code>standard</code> mode for simple lookups</strong> and reserve <code>perspective</code> for complex design questions.</li>
+          <li><strong>Keyword routing saves LLM calls.</strong> Good keyword coverage means the system skips the LLM routing classifier entirely for obvious questions.</li>
+          <li><strong>The response cache</strong> avoids re-querying for similar questions within the TTL window.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 28px; margin-bottom: 16px;">Model Cost Tiers (approximate)</h3>
+    <div class="card card-flush">
+      <table>
+        <thead>
+          <tr><th>Tier</th><th>Models</th><th>Relative Cost</th><th>Best For</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-red">Premium</span></td>
+            <td>Claude Opus 4.5, Claude Opus 4.6</td>
+            <td style="font-weight: 600;">$$$$</td>
+            <td>Lead agent, core logic twins, complex reasoning</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-orange">Standard</span></td>
+            <td>Grok 4.1, Claude Sonnet 4</td>
+            <td style="font-weight: 600;">$$</td>
+            <td>Twin counterparts, general-purpose agents</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-green">Economy</span></td>
+            <td>o4-mini, Gemini 2.0 Flash</td>
+            <td style="font-weight: 600;">$</td>
+            <td>Documentation agents, config scanners, simple tasks</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 9: TIPS & BEST PRACTICES
+     ============================================================ -->
+<section id="tips">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge badge-cyan">9</span>
+      <h2>Tips &amp; Best Practices</h2>
+    </div>
+
+    <div class="card-grid">
+
+      <div class="card card-sm" style="border-top: 3px solid var(--accent);">
+        <h4>Model Diversity Matters</h4>
+        <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+          Do not use all Opus models. The whole point of multi-agent systems is
+          diverse reasoning. Mix providers: Anthropic + xAI + OpenAI + Google.
+          Different architectures catch different blind spots.
+        </p>
+      </div>
+
+      <div class="card card-sm" style="border-top: 3px solid var(--accent2);">
+        <h4>Twin Pairs: Different Providers</h4>
+        <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+          When possible, use different providers for twin pairs (e.g., Opus +
+          Grok). Same-provider twins (Opus 4.5 + Opus 4.6) still provide
+          value through generational differences, but cross-provider pairs
+          provide the strongest cognitive diversity.
+        </p>
+      </div>
+
+      <div class="card card-sm" style="border-top: 3px solid var(--green);">
+        <h4>Routing Instructions Are Everything</h4>
+        <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+          The <code>routing_prompt_extra</code> on your LeadAgent is the single
+          most impactful configuration. Spend time writing clear, specific
+          routing rules with examples. Bad routing means the best agents in
+          the world get the wrong questions.
+        </p>
+      </div>
+
+      <div class="card card-sm" style="border-top: 3px solid var(--orange);">
+        <h4>Start Small, Scale Up</h4>
+        <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+          Begin with 1-2 coordinator groups and 3-4 agents. Run some queries.
+          See what works and what the system misroutes. Add agents as you
+          discover blind spots. Do not start with 14 agents on day one.
+        </p>
+      </div>
+
+      <div class="card card-sm" style="border-top: 3px solid var(--pink);">
+        <h4>Key Files Are Context Boundaries</h4>
+        <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+          An agent can only reason about what it sees. Be deliberate with
+          <code>key_files</code>. An agent that sees everything produces
+          generic answers. An agent that sees only <code>routes/</code>
+          becomes a genuine routing expert.
+        </p>
+      </div>
+
+      <div class="card card-sm" style="border-top: 3px solid var(--yellow);">
+        <h4>Use LEAD_SUB for Implementation</h4>
+        <p style="color: var(--text-dim); font-size: 0.92rem; margin-bottom: 0;">
+          After the system produces a design recommendation, use
+          <code>/promote agent_name</code> to promote the most relevant
+          agent to LEAD_SUB. Subsequent questions route directly to it for
+          detailed implementation, while architectural questions still go to LEAD.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="callout callout-warn" style="margin-top: 24px;">
+      <div class="callout-title">Common Mistakes</div>
+      <ul style="margin-bottom: 0;">
+        <li><strong>Using the same model for everything.</strong> You are paying for a multi-agent system that thinks like a single model.</li>
+        <li><strong>Vague routing instructions.</strong> "This handles backend stuff" is not good enough. List specific topics, file types, and cross-cutting rules.</li>
+        <li><strong>Too many key_files.</strong> An agent that reads 50 files has enormous context and costs a lot. Be selective.</li>
+        <li><strong>Skipping cross-pollination.</strong> Twin pairs are the highest-leverage feature. Use them for any agent that handles complex logic.</li>
+        <li><strong>Setting max_iterations too high.</strong> After 3-5 iterations, returns diminish but cost keeps climbing. Start low.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer style="padding: 48px 0; text-align: center; border-top: 1px solid var(--border);">
+  <div class="container">
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 8px;">
+      multiagentz v0.2.0
+    </p>
+    <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 0;">
+      Multi-agent orchestration framework with consensus and perspective modes.
+      <br>Spin up domain-expert agent stacks from declarative config.
+    </p>
+  </div>
+</footer>
+
+<!-- ============================================================
+     JAVASCRIPT — Collapsible sections
+     ============================================================ -->
+<script>
+function toggleCollapsible(button) {
+  const collapsible = button.closest('.collapsible');
+  collapsible.classList.toggle('open');
+}
+
+// Smooth scroll for nav links (fallback for browsers without CSS scroll-behavior)
+document.querySelectorAll('nav a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (e) {
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('section[id], header[id]');
+const navLinks = document.querySelectorAll('nav a[href^="#"]');
+
+function updateActiveNav() {
+  let current = '';
+  sections.forEach(section => {
+    const sectionTop = section.offsetTop - 100;
+    if (pageYOffset >= sectionTop) {
+      current = section.getAttribute('id');
+    }
+  });
+  navLinks.forEach(link => {
+    link.style.color = '';
+    link.style.background = '';
+    link.style.borderColor = 'transparent';
+    if (link.getAttribute('href') === '#' + current) {
+      link.style.color = 'var(--accent)';
+      link.style.background = 'rgba(56,189,248,0.08)';
+      link.style.borderColor = 'rgba(56,189,248,0.15)';
+    }
+  });
+}
+
+window.addEventListener('scroll', updateActiveNav);
+updateActiveNav();
+</script>
+
+</body>
+</html>
