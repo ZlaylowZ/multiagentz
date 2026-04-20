@@ -27,7 +27,9 @@ Cross-pollination pattern (A/B twin agents):
 
 from __future__ import annotations
 
+import concurrent.futures
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Optional
@@ -35,6 +37,33 @@ from typing import TYPE_CHECKING, Optional
 from multiagentz.llm_client import LLMClient, CHARS_PER_TOKEN_ESTIMATE, MAX_INPUT_TOKENS
 from multiagentz.utils import parse_json_response
 from multiagentz import log
+
+# ── Graceful shutdown infrastructure ──────────────────────────────────
+_shutdown_event = threading.Event()
+
+
+def request_shutdown():
+    """Signal all orchestration threads to stop."""
+    _shutdown_event.set()
+
+
+def reset_shutdown():
+    """Clear shutdown flag (call before starting new orchestration)."""
+    _shutdown_event.clear()
+
+
+def is_shutting_down() -> bool:
+    return _shutdown_event.is_set()
+
+
+def _wait_for_future(fut, label: str = "task"):
+    """Wait for a future result, checking for shutdown every 2s so Ctrl+C works."""
+    while not _shutdown_event.is_set():
+        try:
+            return fut.result(timeout=2.0)
+        except concurrent.futures.TimeoutError:
+            continue
+    raise InterruptedError(f"{label} interrupted by shutdown")
 
 # ── Prompt budget helpers ──────────────────────────────────────────────
 # Max chars for large text blocks injected into prompts.  Keeps the
@@ -128,6 +157,9 @@ class OrchestrationEngine:
         all_conflicts = []
 
         while iteration < max_iterations:
+            if _shutdown_event.is_set():
+                log.warn("Shutdown requested, stopping consensus early")
+                break
             conflict_analysis = self._analyze_conflicts(question, responses)
 
             has_conflicts = conflict_analysis.get("has_conflicts", False)
@@ -447,8 +479,14 @@ Begin by asking your first round of questions."""
         with ThreadPoolExecutor(max_workers=len(perspective_configs)) as pool:
             futures = {pool.submit(_align_one, pc): pc for pc in perspective_configs}
             for fut in as_completed(futures):
-                p_name, ctx = fut.result()
-                contexts[p_name] = ctx
+                try:
+                    p_name, ctx = _wait_for_future(fut, "alignment")
+                    contexts[p_name] = ctx
+                except Exception as e:
+                    pc = futures[fut]
+                    p_name = pc["name"]
+                    log.warn(f"{p_name}  Alignment failed ({type(e).__name__}), using empty context")
+                    contexts[p_name] = ""
 
         log.ok(f"All {len(contexts)} perspectives aligned")
         return contexts
@@ -516,9 +554,14 @@ Be specific and actionable. This is a solution proposal, not just analysis."""
         with ThreadPoolExecutor(max_workers=len(perspective_configs)) as pool:
             futures = {pool.submit(_solve_one, pc): pc for pc in perspective_configs}
             for fut in as_completed(futures):
-                p_name, sol = fut.result()
-                if sol:
-                    solutions[p_name] = sol
+                try:
+                    p_name, sol = _wait_for_future(fut, "solution generation")
+                    if sol:
+                        solutions[p_name] = sol
+                except Exception as e:
+                    pc = futures[fut]
+                    p_name = pc["name"]
+                    log.warn(f"{p_name}  Solution generation failed ({type(e).__name__}), skipping")
 
         log.ok(f"All {len(solutions)} solutions generated")
         return solutions
@@ -541,6 +584,9 @@ Be specific and actionable. This is a solution proposal, not just analysis."""
         all_converged = True  # safe default if max_iterations is 0
 
         while iteration < max_iterations:
+            if _shutdown_event.is_set():
+                log.warn("Shutdown requested, stopping refinement early")
+                break
             log.step(f"LEAD reviewing all solutions (iteration {iteration + 1}/{max_iterations})...")
 
             # LEAD reviews all solutions
@@ -822,8 +868,24 @@ class CrossPollinationEngine:
         fut_a = self._executor.submit(agent_a.query, question)
         fut_b = self._executor.submit(agent_b.query, question)
 
-        out_a = fut_a.result()
-        out_b = fut_b.result()
+        try:
+            out_a = _wait_for_future(fut_a, a_name)
+        except Exception as e:
+            log.warn(f"{a_name}  Initial query failed ({type(e).__name__})")
+            out_a = f"[{a_name} failed to respond: {type(e).__name__}]"
+
+        try:
+            out_b = _wait_for_future(fut_b, b_name)
+        except Exception as e:
+            log.warn(f"{b_name}  Initial query failed ({type(e).__name__})")
+            out_b = f"[{b_name} failed to respond: {type(e).__name__}]"
+
+        # If both agents failed, bail early
+        if out_a.startswith("[") and out_b.startswith("["):
+            return "Both agents failed to respond.", {
+                "mode": "cross_pollination", "error": "both_agents_failed",
+                "agent_a": a_name, "agent_b": b_name,
+            }
 
         iteration_log = [
             {"iteration": 0, "a": out_a[:500], "b": out_b[:500]}
@@ -843,8 +905,17 @@ class CrossPollinationEngine:
             fut_a = self._executor.submit(agent_a.query, refine_prompt_for_a)
             fut_b = self._executor.submit(agent_b.query, refine_prompt_for_b)
 
-            out_a = fut_a.result()
-            out_b = fut_b.result()
+            try:
+                new_a = _wait_for_future(fut_a, f"{a_name} refinement")
+                out_a = new_a
+            except Exception as e:
+                log.warn(f"{a_name}  Refinement round {i+1} failed ({type(e).__name__}), keeping previous")
+
+            try:
+                new_b = _wait_for_future(fut_b, f"{b_name} refinement")
+                out_b = new_b
+            except Exception as e:
+                log.warn(f"{b_name}  Refinement round {i+1} failed ({type(e).__name__}), keeping previous")
 
             iteration_log.append(
                 {"iteration": i + 1, "a": out_a[:500], "b": out_b[:500]}
