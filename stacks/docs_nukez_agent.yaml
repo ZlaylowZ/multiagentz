@@ -1,0 +1,255 @@
+# yaml-language-server: $schema=
+name: docs-nukez-agent
+
+# ============================================================
+# NukezAgent Documentation Generator
+# ============================================================
+# Generates: Architecture Overview → API Reference → Integration Guide
+#
+# Architecture:
+#   Lead (Opus 4.6) @ /Desktop/nukezAgent (root)
+#     → agent_coordinator (Opus 4.6) @ /Desktop/nukezAgent (root)
+#       → service_expert_a (Opus 4.6): service/ — twin A
+#       → service_expert_b (Grok 4.1 reasoning): service/ — twin B
+#       → python_expert (Sonnet 4): python/ — SDK package
+#       → root_expert (Sonnet 4): root repo (excl. service/, python/)
+#
+# Run:
+#   maz --config stacks/docs_nukez_agent.yaml
+#   /perspective "Generate comprehensive documentation for nukezAgent"
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+  repo_path: /Users/zhanson/Desktop/nukezAgent
+
+  routing_prompt_extra: |
+    You are orchestrating documentation generation for nukezAgent —
+    the autonomous storage specialist agent that performs storage
+    operations independently, including LLM-driven tool execution,
+    payment handling, and multi-phase agent workflows.
+
+    The nukezAgent repository lives at /Users/zhanson/Desktop/nukezAgent
+    and is organized into three major areas:
+
+    1. **service/** — The deployed agent service: FastAPI app, inference
+       engine, tool execution, MCP/A2A adapters, signing, state, config,
+       rate limiting, instance management, and tests.
+
+    2. **python/** — The `nukez` Python SDK package: pip-installable
+       client with the 3-intent API (persist, recall, verify).
+
+    3. **Root repo** — Top-level orchestration, contracts, docs, examples,
+       manifests, plans, and prompts (everything outside service/ and python/).
+
+    Your objective is to produce comprehensive documentation in three sections:
+
+    1. **Architecture Overview** — How the agent service works, its
+       inference loop, tool execution, MCP/A2A adapters, signing model,
+       how it integrates with the Nukez gateway, and the Python SDK's
+       role as the programmatic interface.
+
+    2. **API Reference** — Every class, method, and configuration option
+       across the service, Python SDK, and root-level contracts/manifests.
+       Include the tool interface, inference integration points, and
+       contract schemas.
+
+    3. **Integration Guide** — How to deploy the agent service, configure
+       it, use the Python SDK, validate contracts, and debug flows.
+
+    Delegate domain-specific questions to the agent_coordinator.
+
+  keywords:
+    agent_coordinator:
+      - agent
+      - service
+      - inference
+      - tool
+      - executor
+      - payment
+      - signing
+      - mcp
+      - a2a
+      - python
+      - sdk
+      - persist
+      - recall
+      - verify
+      - contract
+      - manifest
+      - config
+
+  agents:
+    agent_coordinator:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      repo_path: /Users/zhanson/Desktop/nukezAgent
+      description: >
+        Coordinator for nukezAgent documentation. Oversees four sub-agents:
+        a twin-agent pair covering the service/ directory (one Opus 4.6,
+        one Grok 4.1 for cross-model perspective), a Python SDK expert for
+        python/, and a root expert for the balance of the repo.
+        Synthesizes their outputs into unified documentation.
+      routing_prompt_extra: |
+        You oversee documentation for the nukezAgent repository.
+        Four sub-agents cover different domains:
+
+        - **service_expert_a** (Opus 4.6): The deployed agent service —
+          FastAPI app, inference loop, tool execution, MCP/A2A adapters,
+          signing, state management, rate limiting, instance management.
+
+        - **service_expert_b** (Grok 4.1): TWIN of service_expert_a —
+          same domain coverage but from a different model's perspective.
+          Use this to cross-validate findings, catch blind spots, and
+          get alternative explanations. When documenting the service,
+          query BOTH twins and synthesize the best of each.
+
+        - **python_expert**: The nukez Python SDK package — the
+          pip-installable client with persist/recall/verify intents,
+          tests, and packaging.
+
+        - **root_expert**: The root repo balance — contracts, docs,
+          examples, manifests, plans, and prompts. Everything outside
+          service/ and python/.
+
+        Routing strategy:
+        - Service runtime, inference, tools, adapters → BOTH service twins
+        - Python SDK, pip package, intents → python_expert
+        - Contracts, manifests, docs, examples → root_expert
+        - Architectural questions spanning multiple areas → query relevant
+          agents and synthesize
+
+      agents:
+        service_expert_a:
+          repo_path: /Users/zhanson/Desktop/nukezAgent/service
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Twin A — Expert on the nukezAgent service: the deployed agent
+            runtime including FastAPI app, inference engine, tool execution,
+            MCP and A2A adapters, signing, state management, configuration,
+            rate limiting, instance management, and tests.
+          system_prompt: >
+            You are an expert on the nukezAgent service — the deployed
+            agent runtime at /Users/zhanson/Desktop/nukezAgent/service/.
+            You know the FastAPI application (app.py), the inference engine
+            (inference.py), tool definitions (tools.py), the agent core
+            (agent.py), MCP adapter (mcp_adapter.py), A2A adapter
+            (a2a_adapter.py), signing logic (signing.py), state management
+            (state.py), configuration (config.py), rate limiting
+            (rate_limiter.py), instance management (instance_manager.py),
+            data models (models.py), and the test suite. Ground every
+            answer in the actual code.
+          key_files:
+            - app.py
+            - agent.py
+            - inference.py
+            - tools.py
+            - mcp_adapter.py
+            - a2a_adapter.py
+            - signing.py
+            - state.py
+            - config.py
+            - rate_limiter.py
+            - instance_manager.py
+            - models.py
+            - requirements.txt
+            - Dockerfile
+            - tests/
+
+        service_expert_b:
+          repo_path: /Users/zhanson/Desktop/nukezAgent/service
+          model: grok-4-1-fast-reasoning
+          provider: xai
+          description: >
+            Twin B — Same domain as service_expert_a but using xAI Grok 4.1
+            reasoning model. Provides cross-model validation and alternative
+            perspectives on the service architecture, inference patterns,
+            and tool execution design.
+          system_prompt: >
+            You are an expert on the nukezAgent service — the deployed
+            agent runtime at /Users/zhanson/Desktop/nukezAgent/service/.
+            You know the FastAPI application (app.py), the inference engine
+            (inference.py), tool definitions (tools.py), the agent core
+            (agent.py), MCP adapter (mcp_adapter.py), A2A adapter
+            (a2a_adapter.py), signing logic (signing.py), state management
+            (state.py), configuration (config.py), rate limiting
+            (rate_limiter.py), instance management (instance_manager.py),
+            data models (models.py), and the test suite. Ground every
+            answer in the actual code. Offer unique insights and flag
+            anything that might be missed by a single-model analysis.
+          key_files:
+            - app.py
+            - agent.py
+            - inference.py
+            - tools.py
+            - mcp_adapter.py
+            - a2a_adapter.py
+            - signing.py
+            - state.py
+            - config.py
+            - rate_limiter.py
+            - instance_manager.py
+            - models.py
+            - requirements.txt
+            - Dockerfile
+            - tests/
+
+        python_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent/python
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on the nukez Python SDK package — the pip-installable
+            client providing the 3-intent API (persist, recall, verify),
+            packaging, and tests.
+          system_prompt: >
+            You are the expert on the nukez Python SDK at
+            /Users/zhanson/Desktop/nukezAgent/python/. This is the
+            pip-installable package that provides programmatic access
+            to nukezAgent via three intents: persist, recall, and verify.
+            You know the package structure, the client API, all public
+            methods, configuration, error handling, and the test suite.
+            Ground every answer in the actual code.
+          key_files:
+            - nukez/
+            - pyproject.toml
+            - tests/
+            - README.md
+
+        root_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on the nukezAgent root repo — contracts, documentation,
+            examples, manifests, plans, and prompts. Covers everything
+            outside the service/ and python/ subdirectories.
+          system_prompt: >
+            You are the expert on the nukezAgent repository's root-level
+            artifacts at /Users/zhanson/Desktop/nukezAgent/. Your domain
+            covers everything OUTSIDE the service/ and python/ directories:
+            contracts (AAAP agent contracts, schemas), docs (architecture
+            docs, guides), examples, manifests (agent.json, agent-card),
+            plans, and prompts. You understand how these artifacts define
+            the agent's identity, capabilities, and integration contracts.
+            Ground every answer in the actual files.
+          key_files:
+            - contracts/
+            - docs/
+            - examples/
+            - manifest/
+            - plans/
+            - prompts/
+            - README.md
+
+    files:
+      type: files
+      watched_paths:
+        - /Users/zhanson/x/multiagentz/outputs/

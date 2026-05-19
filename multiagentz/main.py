@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 import os
+import signal
 import argparse
 import subprocess
 import tempfile
@@ -29,6 +30,7 @@ from rich.table import Table
 
 from multiagentz.stack import load_stack
 from multiagentz.memory import SessionMemory
+from multiagentz.orchestration import request_shutdown, reset_shutdown
 
 
 console = Console()
@@ -144,6 +146,7 @@ def print_help():
         ("/consensus <question>", "Force consensus mode for a query"),
         ('/perspective "<q>" [agents]', "Multi-perspective analysis"),
         ("/build <task>", "Plan and execute a coding task"),
+        ("/generate <path> [goal]", "Generate a stack YAML from a repo"),
         ("quit", "Exit"),
     ]
     for cmd, desc in commands:
@@ -356,20 +359,66 @@ def run_setup():
 
 # ── Main loop ───────────────────────────────────────────────────────────
 
+def _force_exit(signum, frame):
+    """Second Ctrl+C or SIGTERM → hard kill, no matter what threads are doing."""
+    sys.stderr.write("\nForce quit.\n")
+    os._exit(1)
+
+
 def main():
+    # First Ctrl+C sets shutdown flag (handled in the loop);
+    # second Ctrl+C force-kills via _force_exit.
+    signal.signal(signal.SIGTERM, _force_exit)
+
     parser = argparse.ArgumentParser(description="Multi-Agent Stack REPL")
     parser.add_argument("--config", "-c", help="Path to stack YAML config")
-    parser.add_argument("setup", nargs="?", help="Run interactive setup wizard")
+    parser.add_argument("command", nargs="?", help="Command: setup | generate")
+
+    # Generate-specific args
+    parser.add_argument("repos", nargs="*", help="Repository paths (for generate)")
+    parser.add_argument("--goal", "-g", help="Goal for stack generation")
+    parser.add_argument("--output", "-o", help="Output YAML path")
+    parser.add_argument("--max-chars", type=int, default=200_000,
+                        help="Max chars per agent (default: 200000)")
+    parser.add_argument("--model", default="claude-sonnet-4-20250514",
+                        help="LLM model for generation")
+    parser.add_argument("--mode", help="Orchestration mode override")
     args = parser.parse_args()
 
     # Handle `maz setup`
-    if args.setup == "setup":
+    if args.command == "setup":
         run_setup()
+        return
+
+    # Handle `maz generate <repos...>`
+    if args.command == "generate":
+        from multiagentz.generate import generate_stack
+        repo_paths = args.repos
+        if not repo_paths:
+            console.print("[red]Usage: maz generate <repo_path> [<repo_path2> ...] --goal \"your goal\"[/red]")
+            console.print("[dim]Example: maz generate /path/to/repo --goal \"document the codebase\" -o stacks/docs.yaml[/dim]")
+            return
+        goal = args.goal
+        if not goal:
+            console.print("[yellow]What is the goal for this stack?[/yellow]")
+            goal = console.input("[bold green]Goal:[/bold green] ").strip()
+            if not goal:
+                console.print("[red]A goal is required for stack generation.[/red]")
+                return
+        generate_stack(
+            repo_paths=repo_paths,
+            goal=goal,
+            output_path=args.output,
+            max_chars_per_agent=args.max_chars,
+            model=args.model,
+            orchestration_mode=args.mode,
+        )
         return
 
     if not args.config:
         parser.print_help()
         console.print("\n[dim]Tip: Run 'maz setup' first to configure your API keys.[/dim]")
+        console.print("[dim]     Run 'maz generate <repo> --goal \"...\"' to auto-generate a stack.[/dim]")
         return
 
     try:
@@ -529,6 +578,9 @@ def main():
                 console.print(f"[cyan]{result}[/cyan]\n")
                 continue
 
+            # Reset shutdown flag before any orchestration work
+            reset_shutdown()
+
             # Consensus mode
             if question.lower().startswith("/consensus "):
                 actual_question = question[11:].strip()
@@ -634,6 +686,35 @@ def main():
                 # Export to HTML
                 filepath = export_response(response, actual_question, fmt="html")
                 console.print(f"\n[dim]Saved: {filepath}[/dim]\n")
+                continue
+
+            # Generate mode (in-REPL shortcut)
+            if question.lower().startswith("/generate "):
+                parts = question[10:].strip().split(None, 1)
+                if not parts:
+                    console.print("[red]Usage: /generate <repo_path> [goal][/red]\n")
+                    continue
+                gen_repo = parts[0]
+                gen_goal = parts[1] if len(parts) > 1 else None
+                if not gen_goal:
+                    console.print("[yellow]What is the goal for this stack?[/yellow]")
+                    gen_goal = console.input("[bold green]Goal:[/bold green] ").strip()
+                if not gen_goal:
+                    console.print("[red]A goal is required.[/red]\n")
+                    continue
+                from multiagentz.generate import generate_stack
+                try:
+                    yaml_out = generate_stack(
+                        repo_paths=[gen_repo],
+                        goal=gen_goal,
+                        output_path=f"stacks/generated_{Path(gen_repo).name}.yaml",
+                    )
+                    if yaml_out:
+                        console.print(f"\n[bold green]Stack generated![/bold green]\n")
+                except Exception as e:
+                    console.print(f"[red]Generation failed: {e}[/red]\n")
+                    import traceback
+                    console.print(f"[dim]{traceback.format_exc()}[/dim]\n")
                 continue
 
             # Build mode
@@ -784,13 +865,18 @@ def main():
             console.print("[dim]/export [fmt] to re-export[/dim]\n")
 
         except KeyboardInterrupt:
+            # Signal orchestration threads to stop gracefully
+            request_shutdown()
+            # Second Ctrl+C → force exit (threads may be stuck)
+            signal.signal(signal.SIGINT, _force_exit)
+            console.print("\n[yellow]Interrupted — shutting down… (Ctrl+C again to force quit)[/yellow]")
             break
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]\n")
             import traceback
             console.print(f"[dim]{traceback.format_exc()}[/dim]\n")
 
-    console.print("\n[dim]Goodbye![/dim]")
+    console.print("[dim]Goodbye![/dim]")
 
 
 if __name__ == "__main__":

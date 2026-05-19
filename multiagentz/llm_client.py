@@ -10,9 +10,57 @@ Supports per-instance configuration:
 
 from __future__ import annotations
 
+import random
+import time
 from typing import Any, Optional
 
 from multiagentz.llm_config import llm_config, _infer_provider_from_model
+
+# ── Retry constants ───────────────────────────────────────────────────
+_APP_RETRIES = 3        # Additional app-level retries (on top of SDK's max_retries=3)
+_BASE_DELAY = 2.0       # seconds
+_MAX_DELAY = 30.0       # seconds
+_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 529}
+
+
+def friendly_api_error(exc: Exception) -> str:
+    """Return a concise, human-readable description of an LLM API error."""
+    status = getattr(exc, "status_code", None)
+    body = getattr(exc, "body", None) or {}
+    err = body.get("error", {}) if isinstance(body, dict) else {}
+    msg = err.get("message", "") if isinstance(err, dict) else ""
+    code = err.get("code", "") if isinstance(err, dict) else ""
+
+    # ── Permanent quota / billing errors ──────────────────────────────
+    if code == "insufficient_quota" or "exceeded your current quota" in str(exc):
+        return "API quota exhausted — check your plan and billing at your provider's dashboard"
+
+    # ── Authentication errors ─────────────────────────────────────────
+    if status == 401 or code == "invalid_api_key":
+        return "Invalid or missing API key — run `maz setup` to configure"
+
+    # ── Model not found ───────────────────────────────────────────────
+    if status == 404 or code == "model_not_found":
+        model = getattr(exc, "param", None) or ""
+        return f"Model not found{f': {model}' if model else ''} — check your stack YAML"
+
+    # ── Rate limit (transient) ────────────────────────────────────────
+    if status == 429:
+        return "Rate limited by provider — retrying"
+
+    # ── Server errors ─────────────────────────────────────────────────
+    if status and status >= 500:
+        return f"Provider server error (HTTP {status}) — retrying"
+
+    # ── Timeout errors ────────────────────────────────────────────────
+    exc_name = type(exc).__name__
+    if "Timeout" in exc_name:
+        return "Request timed out — retrying"
+
+    # ── Fallback: use the SDK message if available, else repr ─────────
+    if msg:
+        return msg[:200]
+    return str(exc)[:200]
 
 # ── Token budget constants ─────────────────────────────────────────────
 # Conservative estimate: ~3.5 chars per token for mixed English/code.
@@ -238,6 +286,48 @@ class LLMClient:
 
         return prompt, system
 
+    @staticmethod
+    def _is_transient(exc: Exception) -> bool:
+        """Return True if the exception represents a transient/retryable API error."""
+        # Check for status_code attribute (both Anthropic and OpenAI SDK errors)
+        status = getattr(exc, "status_code", None)
+        if status and status in _TRANSIENT_STATUS_CODES:
+            # OpenAI returns 429 for both rate-limits (transient) and
+            # insufficient_quota (permanent).  Don't retry permanent errors.
+            body = getattr(exc, "body", None) or {}
+            err = body.get("error", {}) if isinstance(body, dict) else {}
+            err_code = err.get("code", "") if isinstance(err, dict) else ""
+            err_type = err.get("type", "") if isinstance(err, dict) else ""
+            if err_code == "insufficient_quota" or err_type == "insufficient_quota":
+                return False
+            return True
+        # httpx timeout errors
+        exc_name = type(exc).__name__
+        if exc_name in ("ReadTimeout", "ConnectTimeout", "WriteTimeout", "PoolTimeout"):
+            return True
+        return False
+
+    def _call_with_retry(self, fn, *args, **kwargs):
+        """Call fn with app-level exponential backoff retry on transient errors."""
+        last_exc = None
+        for attempt in range(_APP_RETRIES + 1):
+            try:
+                return fn(*args, **kwargs)
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                if not self._is_transient(exc) or attempt == _APP_RETRIES:
+                    raise
+                last_exc = exc
+                delay = min(_BASE_DELAY * (2 ** attempt) + random.uniform(0, 1), _MAX_DELAY)
+                from multiagentz import log
+                log.warn(
+                    f"{friendly_api_error(exc)}, "
+                    f"retry {attempt + 1}/{_APP_RETRIES} in {delay:.1f}s"
+                )
+                time.sleep(delay)
+        raise last_exc  # unreachable
+
     def complete(
         self,
         prompt: str,
@@ -278,7 +368,7 @@ class LLMClient:
         if system:
             kw["system"] = system
         
-        resp = self._client.messages.create(**kw)
+        resp = self._call_with_retry(self._client.messages.create, **kw)
         text = resp.content[0].text
         stop = resp.stop_reason
         
@@ -331,7 +421,7 @@ class LLMClient:
         else:
             kw["max_tokens"] = max_tokens
 
-        resp = self._client.chat.completions.create(**kw)
+        resp = self._call_with_retry(self._client.chat.completions.create, **kw)
 
         text = resp.choices[0].message.content
         stop = resp.choices[0].finish_reason

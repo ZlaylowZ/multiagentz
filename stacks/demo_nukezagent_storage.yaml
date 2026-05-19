@@ -1,0 +1,309 @@
+# yaml-language-server: $schema=
+name: demo-nukezagent-storage
+
+# ============================================================
+# NukezAgent Storage Demo — Dogfooding via PyNukez Doc Generation
+# ============================================================
+# Same doc generation stack as docs_pynukez.yaml, but with:
+#
+#   1. STORAGE — Lead stores each doc section via NukezAgent,
+#      building a receipt-bound artifact trail.
+#
+#   2. CONTEXT MANAGEMENT — Lead persists decisions and outlines
+#      via NukezAgent memory across perspective iterations.
+#
+#   3. REPORTER — A dedicated reporter agent observes every phase
+#      of the orchestration and produces a running operational
+#      report: what each agent did, what was stored, what was
+#      refined, token costs, and a final executive summary.
+#
+# Prerequisites:
+#   cd /Users/zhanson/Desktop/nukezAgent && \
+#     source /Users/zhanson/multiagentz/.env && \
+#     STATE_BACKEND=memory NUKEZ_NETWORK=devnet python -m service.app
+#
+# Architecture:
+#   Lead (Opus 4.6)
+#     → pynukez_coordinator (Opus 4.6)
+#       → sdk_expert (gpt-5.4) — reads the pynukez codebase
+#     → nukez_agent (ServiceAgent) — stores output + manages context
+#     → reporter (Sonnet 4) — observes and reports on all operations
+#
+# Run:
+#   maz --config stacks/docs_pynukez_nukez.yaml
+#   > Generate comprehensive documentation for pynukez
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    You are orchestrating documentation generation for the pynukez SDK.
+
+    You have three agent groups:
+
+    **pynukez_coordinator** — Your documentation team. Delegates to an
+    SDK expert sub-agent that has full read access to the pynukez codebase.
+    Send all code analysis, API extraction, and documentation drafting
+    questions here.
+
+    **nukez_agent** — Your storage and memory backend. A live NukezAgent
+    instance running at localhost:8080. Use it for two purposes:
+
+    1. **Storing documentation output.** After each major section is
+       drafted (Architecture Overview, API Reference, Integration Guide),
+       ask nukez_agent to store it:
+       - "Store this as pynukez_docs_architecture.md: [content]"
+       - "Store this as pynukez_docs_api_reference.md: [content]"
+       - "Store this as pynukez_docs_integration_guide.md: [content]"
+       Each store produces a receipt. Include the receipt IDs in your
+       final synthesis so the user has a verifiable artifact trail.
+
+    2. **Managing cross-phase context.** Before starting each perspective
+       iteration, store your current outline, key decisions, and any
+       open questions as memory records:
+       - "Remember that we decided to organize the API reference by
+         module rather than alphabetically. Tag it as doc-decision."
+       - "Remember the section outline: 1. Architecture, 2. API Ref
+         (by module), 3. Integration Guide. Tag it as doc-outline."
+       Before refining, recall prior decisions:
+       - "What documentation decisions have we made?"
+       This gives you persistent state across the perspective phases
+       instead of starting each iteration cold.
+
+    **reporter** — Your operations observer. After EVERY significant step
+    in the workflow, send the reporter a brief update describing what
+    just happened. The reporter maintains a running operational log and
+    will produce a final executive summary at the end.
+
+    Send the reporter updates like:
+    - "Phase: Bootstrap Q&A. sdk_expert answered 3 questions about
+       module structure, auth patterns, and type hierarchy."
+    - "Phase: Section Draft. Architecture Overview drafted (2,400 words).
+       Stored via nukez_agent — receipt pending signing."
+    - "Phase: Refinement Round 1. Lead identified gaps in payment flow
+       docs. sdk_expert providing additional detail on evm_payment.py."
+    - "Phase: Final Synthesis. All 3 sections complete. 3 files stored.
+       2 memory records persisted."
+
+    At the very end, after your final documentation synthesis, query the
+    reporter: "Produce the final operations report." Include the report
+    as an appendix to your output.
+
+    **Workflow:**
+    1. Query pynukez_coordinator for code analysis
+       → Update reporter: what was asked, what came back
+    2. Store your outline and decisions via nukez_agent (memory)
+       → Update reporter: what was persisted
+    3. Draft each section using pynukez_coordinator's output
+       → Update reporter: section name, word count, coverage
+    4. Store each completed section via nukez_agent (file storage)
+       → Update reporter: filename, receipt status
+    5. Recall prior context before refinement iterations
+       → Update reporter: what was recalled, what changed
+    6. Final synthesis includes receipt IDs for all stored artifacts
+    7. Query reporter for final operations report
+    8. Append operations report to output
+
+    Your objective: produce three-section documentation (Architecture
+    Overview → API Reference → Integration Guide) that is both returned
+    to the user in the REPL and persisted as verifiable artifacts in
+    the Nukez locker, with a full operations report appended.
+
+    Focus areas for pynukez:
+    - The Nukez client class and its 40+ storage methods
+    - The Ed25519 auth/signing model (Keypair, build_signed_envelope)
+    - The type system (Receipt, FileUrls, FileInfo, etc.)
+    - Payment flows (SOL + EVM)
+    - Security hardening, HTTP internals, error taxonomy
+    - Integration patterns with LLM frameworks
+
+  keywords:
+    pynukez_coordinator:
+      - sdk
+      - client
+      - auth
+      - signing
+      - keypair
+      - file
+      - type
+      - api
+      - method
+      - pynukez
+      - module
+      - class
+      - function
+      - code
+      - source
+      - documentation
+      - architecture
+      - reference
+      - guide
+
+    nukez_agent:
+      - store
+      - save
+      - persist
+      - remember
+      - recall
+      - memory
+      - decision
+      - outline
+      - context
+      - artifact
+      - receipt
+      - locker
+      - nukez
+      - backup
+
+    reporter:
+      - report
+      - status
+      - update
+      - phase
+      - summary
+      - operations
+      - log
+      - progress
+      - observer
+      - what happened
+
+  agents:
+    # ══════════════════════════════════════════════════════════
+    # Documentation Team
+    # ══════════════════════════════════════════════════════════
+    pynukez_coordinator:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Coordinator for pynukez SDK documentation. Oversees the SDK expert
+        sub-agent, reviews output quality, ensures completeness of API
+        coverage, and formulates optimal documentation structure.
+      routing_prompt_extra: |
+        You oversee documentation generation for the pynukez SDK.
+        Route all questions to the sdk_expert — it has full context
+        on the codebase. Review its responses for completeness and
+        accuracy before passing them up to the lead.
+
+      agents:
+        sdk_expert:
+          repo_path: /Users/zhanson/pynukez
+          model: gpt-5.4
+          provider: openai
+          description: >
+            De facto expert on the pynukez SDK. Has full read access to
+            all source code, tests, documentation, and examples. Produces
+            detailed analysis, API documentation, and usage guidance.
+          system_prompt: >
+            You are the definitive expert on the pynukez Python SDK (v3.1.0).
+            You have read every source file, test, and example. When asked
+            about any aspect of the SDK, provide precise, code-grounded
+            answers with exact method signatures, parameter types, and
+            return values. Reference specific files and line numbers when
+            relevant. Your documentation should be authoritative enough
+            to serve as the official reference.
+          key_files:
+            - pynukez/__init__.py
+            - pynukez/client.py
+            - pynukez/auth.py
+            - pynukez/types.py
+            - pynukez/_http.py
+            - pynukez/errors.py
+            - pynukez/payment.py
+            - pynukez/evm_payment.py
+            - pynukez/hardening.py
+            - pynukez/discovery.py
+            - docs/API.md
+            - docs/QUICKSTART.md
+            - docs/TOOL_PATTERN.md
+            - docs/integrations/
+            - examples/
+            - tests/
+            - README.md
+            - pyproject.toml
+
+    # ══════════════════════════════════════════════════════════
+    # Storage & Context Management (Live NukezAgent)
+    # ══════════════════════════════════════════════════════════
+    nukez_agent:
+      type: service
+      base_url: http://localhost:8080
+      endpoint: /v1/chat
+      timeout: 120
+      description: >
+        Live NukezAgent storage specialist. Stores documentation artifacts
+        as files in a Nukez locker with receipt-bound verification. Also
+        serves as the persistent memory backend — stores decisions,
+        outlines, and cross-phase context as structured memory records.
+        Every write produces a cryptographic receipt. Use for both
+        "store this document section" and "remember this decision."
+
+    # ══════════════════════════════════════════════════════════
+    # Operations Reporter
+    # ══════════════════════════════════════════════════════════
+    reporter:
+      repo_path: /Users/zhanson/pynukez
+      model: claude-sonnet-4-20250514
+      provider: anthropic
+      description: >
+        Operations observer and reporter. Receives updates from the lead
+        after every significant orchestration step. Maintains a running
+        log of all agent activity — who was queried, what they produced,
+        what was stored, what was refined, and any issues encountered.
+        On request, produces a structured executive summary of the
+        entire documentation generation run.
+      system_prompt: >
+        You are the operations reporter for a multi-agent documentation
+        generation pipeline. Your job is to observe and log — never to
+        participate in the documentation work itself.
+
+        As the lead agent sends you updates throughout the run, maintain
+        a structured internal log with these fields per entry:
+        - Timestamp (relative: "Step 1", "Step 2", etc.)
+        - Phase (Bootstrap Q&A, Section Draft, Storage, Refinement, Synthesis)
+        - Agents involved (which agents were queried)
+        - Action taken (what was asked, what was produced)
+        - Output metrics (word count, file count, receipt IDs if any)
+        - Issues or decisions (anything notable)
+
+        When processing updates:
+        - Acknowledge briefly: "Logged: [one-line summary]"
+        - Do NOT produce the full report until explicitly asked
+
+        When asked for the final report, produce a structured document:
+
+        # Operations Report — PyNukez Documentation Generation
+
+        ## Executive Summary
+        One paragraph: what was produced, how many phases, how many
+        agent interactions, what was stored.
+
+        ## Timeline
+        Chronological table of every logged step with phase, agents,
+        action, and metrics.
+
+        ## Agent Activity
+        Per-agent breakdown: how many times queried, what they contributed.
+
+        ## Storage Artifacts
+        List of files stored via NukezAgent with receipt IDs.
+
+        ## Memory Records
+        List of decisions/context persisted via NukezAgent memory.
+
+        ## Observations
+        Any notable patterns, bottlenecks, or quality notes from the run.
+
+        Keep the report factual. You are a logger, not an editor.
+        Do not critique the documentation content — only report on
+        the process that produced it.
+      key_files:
+        - README.md
+
+disable_files_agent: true

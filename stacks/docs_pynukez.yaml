@@ -1,0 +1,128 @@
+# yaml-language-server: $schema=
+name: docs-pynukez
+
+# ============================================================
+# PyNukez SDK Documentation Generator
+# ============================================================
+# Generates: Architecture Overview → API Reference → Integration Guide
+#
+# Architecture:
+#   Lead (Opus 4.6) → Coordinator (Opus 4.6) → 1 sub-agent (gpt-5.4)
+#
+# Run:
+#   maz --config stacks/docs_pynukez.yaml
+#   /perspective "Generate comprehensive documentation for pynukez"
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    You are orchestrating documentation generation for the pynukez SDK —
+    the Python client library for the Nukez decentralized storage network.
+
+    Your objective is to produce comprehensive documentation in three sections:
+
+    1. **Architecture Overview** — How components fit together, data flow,
+       key design decisions, dependency relationships. Written for someone
+       who needs to understand the SDK before using it.
+
+    2. **API Reference** — Every public class, method, function, and constant.
+       Include: signature, parameters with types, return types, exceptions
+       raised, and a brief usage example for each. Organized by module.
+
+    3. **Integration Guide** — Task-oriented: how to install, configure, and
+       use in common scenarios. Include quickstart, cookbook patterns, gotchas,
+       and best practices.
+
+    Focus areas specific to pynukez:
+    - The Nukez client class and its 40+ storage methods
+    - The Ed25519 auth/signing model (Keypair, build_signed_envelope, compute_locker_id)
+    - The type system (Receipt, FileUrls, FileInfo, etc.)
+    - Payment flows (SOL via Solana + EVM chains via evm_payment.py)
+    - Security hardening (hardening.py)
+    - HTTP client internals (_http.py)
+    - Integration patterns with LLM frameworks (see docs/integrations/)
+    - Error taxonomy (errors.py)
+
+    Delegate all code-level questions to the pynukez_coordinator.
+    Synthesize sub-agent outputs into a unified, well-structured document.
+
+  keywords:
+    pynukez_coordinator:
+      - sdk
+      - client
+      - auth
+      - signing
+      - keypair
+      - receipt
+      - file
+      - storage
+      - locker
+      - payment
+      - type
+      - api
+      - method
+      - pynukez
+
+  agents:
+    pynukez_coordinator:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Coordinator for pynukez SDK documentation. Oversees the SDK expert
+        sub-agent, reviews output quality, ensures completeness of API
+        coverage, and formulates optimal documentation structure.
+      routing_prompt_extra: |
+        You oversee documentation generation for the pynukez SDK.
+        Route all questions to the sdk_expert — it has full context
+        on the codebase. Review its responses for completeness and
+        accuracy before passing them up to the lead.
+
+      agents:
+        sdk_expert:
+          repo_path: /Users/zhanson/pynukez
+          model: gpt-5.4
+          provider: openai
+          description: >
+            De facto expert on the pynukez SDK. Has full read access to
+            all source code, tests, documentation, and examples. Produces
+            detailed analysis, API documentation, and usage guidance.
+          system_prompt: >
+            You are the definitive expert on the pynukez Python SDK (v3.1.0).
+            You have read every source file, test, and example. When asked
+            about any aspect of the SDK, provide precise, code-grounded
+            answers with exact method signatures, parameter types, and
+            return values. Reference specific files and line numbers when
+            relevant. Your documentation should be authoritative enough
+            to serve as the official reference.
+          key_files:
+            - pynukez/__init__.py
+            - pynukez/client.py
+            - pynukez/auth.py
+            - pynukez/types.py
+            - pynukez/_http.py
+            - pynukez/errors.py
+            - pynukez/payment.py
+            - pynukez/evm_payment.py
+            - pynukez/hardening.py
+            - pynukez/discovery.py
+            - docs/API.md
+            - docs/QUICKSTART.md
+            - docs/TOOL_PATTERN.md
+            - docs/integrations/
+            - examples/
+            - tests/
+            - README.md
+            - pyproject.toml
+
+    files:
+      type: files
+      watched_paths:
+        - /Users/zhanson/x/multiagentz/outputs/

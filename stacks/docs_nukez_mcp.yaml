@@ -1,0 +1,129 @@
+# yaml-language-server: $schema=
+name: docs-nukez-mcp
+
+# ============================================================
+# Nukez MCP Server Documentation Generator
+# ============================================================
+# Generates: Architecture Overview → API Reference → Integration Guide
+#
+# Architecture:
+#   Lead (Opus 4.6) → Coordinator (Opus 4.6) → 1 sub-agent (gpt-5.4)
+#
+# Run:
+#   maz --config stacks/docs_nukez_mcp.yaml
+#   /perspective "Generate comprehensive documentation for nukez-mcp"
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    You are orchestrating documentation generation for nukez-mcp —
+    the MCP (Model Context Protocol) server that exposes Nukez storage
+    as thick tools for LLM hosts like Claude Desktop and Cursor.
+
+    Your objective is to produce comprehensive documentation in three sections:
+
+    1. **Architecture Overview** — How the MCP server is structured, how it
+       wraps pynukez, the thick tool pattern, state management, and how
+       MCP hosts consume the tools.
+
+    2. **API Reference** — Every MCP tool (8 thick tools), their parameters,
+       return schemas, error handling, and internal implementation. Plus
+       the state backend, memory system, and tool manifest.
+
+    3. **Integration Guide** — How to install, configure for Claude Desktop /
+       Cursor / other MCP hosts, environment variables, keypair setup,
+       and common usage patterns.
+
+    Focus areas specific to nukez-mcp:
+    - The 8 thick MCP tools (server.py) and their implementations (thick_tools.py)
+    - FastMCP server configuration and transport modes (stdio, SSE)
+    - State management (state.py, state_backend.py) and persistence
+    - Memory operations (memory.py) — structured key-value storage
+    - Tool manifest definitions (tool_manifest.py)
+    - The bundled pynukez SDK and auth cascade (server.py L99-113)
+    - Keypair resolution: env var → file path → generate
+    - Docker deployment (Dockerfile, entrypoint.py)
+    - Diagnostics and tracing (diagnostics/)
+
+    Delegate all code-level questions to the mcp_coordinator.
+
+  keywords:
+    mcp_coordinator:
+      - mcp
+      - tool
+      - server
+      - fastmcp
+      - thick
+      - state
+      - memory
+      - manifest
+      - claude
+      - cursor
+      - stdio
+      - transport
+
+  agents:
+    mcp_coordinator:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Coordinator for nukez-mcp documentation. Oversees the MCP expert
+        sub-agent, reviews tool documentation completeness, ensures all
+        8 tools are fully documented with schemas and examples.
+      routing_prompt_extra: |
+        You oversee documentation generation for the nukez-mcp server.
+        Route all questions to the mcp_expert. Review its responses for
+        completeness — every thick tool must be documented with its full
+        parameter schema, return format, and error cases.
+
+      agents:
+        mcp_expert:
+          repo_path: /Users/zhanson/nukez-mcp
+          model: gpt-5.4
+          provider: openai
+          description: >
+            De facto expert on the Nukez MCP server implementation.
+            Has full read access to the server code, thick tools, state
+            management, memory system, tool manifest, diagnostics, and
+            the bundled pynukez SDK.
+          system_prompt: >
+            You are the definitive expert on nukez-mcp (v1.1.0) — the MCP
+            server that exposes Nukez decentralized storage as thick tools
+            for LLM hosts. You know every tool definition, every state
+            transition, every error path. When documenting tools, include
+            the exact parameter schemas from tool_manifest.py and the
+            implementation logic from thick_tools.py. Reference the
+            keypair resolution cascade in server.py. Your documentation
+            should enable any developer to configure and use this MCP
+            server without reading the source code.
+          key_files:
+            - nukez_mcp/__init__.py
+            - nukez_mcp/__main__.py
+            - nukez_mcp/server.py
+            - nukez_mcp/thick_tools.py
+            - nukez_mcp/tool_manifest.py
+            - nukez_mcp/memory.py
+            - nukez_mcp/state.py
+            - nukez_mcp/state_backend.py
+            - nukez_mcp/tests/
+            - pynukez/auth.py
+            - pynukez/client.py
+            - pynukez/types.py
+            - diagnostics/
+            - entrypoint.py
+            - Dockerfile
+            - pyproject.toml
+            - README.md
+
+    files:
+      type: files
+      watched_paths:
+        - /Users/zhanson/x/multiagentz/outputs/

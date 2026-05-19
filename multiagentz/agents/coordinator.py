@@ -291,9 +291,12 @@ Provide a coherent, integrated answer. Do not simply concatenate."""
         if queries:
             futures = [self._executor.submit(_query_one, s) for s in queries]
             for f in futures:
-                name, resp = f.result()
-                if name:
-                    responses[name] = resp
+                try:
+                    name, resp = f.result()
+                    if name:
+                        responses[name] = resp
+                except Exception as e:
+                    _log.warn(f"{self.name}: sub-agent query failed ({type(e).__name__}), skipping")
 
         if not responses:
             _log.warn(f"{self.name}: no agents responded")

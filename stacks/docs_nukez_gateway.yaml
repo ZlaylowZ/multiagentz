@@ -1,0 +1,481 @@
+# yaml-language-server: $schema=
+name: docs-nukez-gateway
+
+# ============================================================
+# Nukez Gateway Documentation Generator
+# ============================================================
+# Generates: Architecture Overview → API Reference → Integration Guide
+#
+# Architecture:
+#   Lead (Opus 4.6)
+#     → gateway (meta-coordinator, cross-pollination enabled)
+#       → opus_team (Coordinator, Opus 4.6)     ←──twin──→  grok_team
+#         → routes_expert    (gpt-5.4)          (identical subs)
+#         → switchboard_expert (claude-opus-4-5)
+#         → app_expert       (Sonnet 4)
+#         → core_expert      (Opus 4.6)
+#       → grok_team (Coordinator, Grok 4.1 fast-reasoning)
+#         → routes_expert    (gpt-5.4)
+#         → switchboard_expert (claude-opus-4-5)
+#         → app_expert       (Sonnet 4)
+#         → core_expert      (Opus 4.6)
+#
+# Cross-pollination flow:
+#   1. Same prompt → opus_team + grok_team (parallel)
+#   2. Each coordinator routes to its 4 subs, synthesizes
+#   3. Outputs swapped: opus gets grok's synthesis, grok gets opus's
+#   4. Each refines incorporating counterpart's perspective
+#   5. Parent coordinator reconciles into final answer
+#
+# Run:
+#   maz --config stacks/docs_nukez_gateway.yaml
+#   /perspective "Generate comprehensive documentation for the Nukez gateway"
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+  cross_pollination: true
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    You are orchestrating documentation generation for the Nukez gateway —
+    the core FastAPI service at api.nukez.xyz that handles storage operations,
+    payment processing, chain attestation, and file management for the
+    entire Nukez ecosystem.
+
+    This is the largest and most complex repository. It includes:
+    - 25+ route handlers serving the REST API
+    - 10 storage provider backends (GCS, Azure, MongoDB, Storj, Arweave, etc.)
+    - Solana and EVM chain integration (payments, attestation, bridging)
+    - Ed25519 signed request verification
+    - Merkle proof generation and verification
+    - A pricing engine with cost calculation and quoting
+    - JWT authentication and API key management
+    - An agent knowledge base (14 markdown documents)
+    - Rate limiting, SSRF protection, and security hardening
+
+    Your objective is to produce comprehensive documentation in three sections:
+
+    1. **Architecture Overview** — The gateway's layered architecture: routes →
+       core logic → storage providers → chain operations. Data flow for a
+       complete storage request lifecycle. The meta-store abstraction. The
+       payment and attestation pipeline.
+
+    2. **API Reference** — Every route handler with its HTTP method, path,
+       parameters, request/response schemas, auth requirements, and error
+       codes. Every core module's public interface. Storage provider
+       contracts. Payment and pricing APIs.
+
+    3. **Integration Guide** — How to deploy the gateway (Docker, Cloud Run),
+       configure storage providers, set up Solana/EVM wallets, manage
+       operator delegation, and integrate with the agent knowledge system.
+
+    You have twin coordinator teams (opus_team and grok_team) that will
+    independently analyze the codebase and cross-pollinate their findings.
+    Let the cross-pollination process resolve any disagreements naturally.
+    Your job is to synthesize the reconciled output into final documentation.
+
+  keywords:
+    gateway:
+      - gateway
+      - route
+      - storage
+      - provider
+      - payment
+      - attestation
+      - chain
+      - solana
+      - evm
+      - merkle
+      - receipt
+      - locker
+      - upload
+      - file
+      - api
+      - core
+      - pricing
+
+  agents:
+    # ══════════════════════════════════════════════════════════
+    # Gateway Meta-Coordinator (hosts twin pair)
+    # ══════════════════════════════════════════════════════════
+    gateway:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      max_workers: 8
+      description: >
+        Meta-coordinator for gateway documentation. Hosts twin coordinator
+        teams (opus_team and grok_team) that independently analyze the
+        gateway codebase with cross-pollination for maximum coverage.
+      routing_prompt_extra: |
+        You host two twin analysis teams for the Nukez gateway:
+        - **opus_team**: Led by Claude Opus 4.6 with 4 domain-specific sub-agents
+        - **grok_team**: Led by Grok 4.1 fast-reasoning with identical sub-agents
+
+        Both teams receive the same prompts and produce independent analyses.
+        Cross-pollination swaps their outputs and each refines against the
+        other's perspective before you reconcile the final answer.
+
+        Always dispatch to both twins — never route to just one.
+
+      agents:
+        # ── Twin A: Opus Team ────────────────────────────────
+        opus_team:
+          type: coordinator
+          model: claude-opus-4-6
+          provider: anthropic
+          twin: grok_team
+          description: >
+            Opus-led analysis team for the Nukez gateway. Routes to 4
+            domain-specific sub-agents covering routes, switchboard,
+            app surface, and core internals.
+          routing_prompt_extra: |
+            You lead the Opus analysis team for gateway documentation.
+            Route questions to the appropriate sub-agent by domain:
+            - **routes_expert**: All HTTP route handlers (gateway/app/routes/)
+            - **switchboard_expert**: Job definitions and switchboard config
+            - **app_expert**: FastAPI application setup, schemas, middleware
+            - **core_expert**: All core logic — storage, auth, chain, payments
+
+            For broad architectural questions, query all four subs and
+            synthesize. For specific module questions, route to the
+            domain expert.
+
+          agents:
+            routes_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: gpt-5.4
+              provider: openai
+              description: >
+                Expert on gateway route handlers — 25+ endpoint modules
+                covering storage, files, receipts, attestation, wallets,
+                operators, verification, and the agent knowledge system.
+              system_prompt: >
+                You are the expert on the Nukez gateway's route handlers.
+                You know every endpoint, its HTTP method, path, auth
+                requirements, request/response schemas, and error codes.
+                Document each route module precisely with examples.
+              key_files:
+                - gateway/app/routes/__init__.py
+                - gateway/app/routes/storage.py
+                - gateway/app/routes/storage_request.py
+                - gateway/app/routes/storage_confirm.py
+                - gateway/app/routes/files.py
+                - gateway/app/routes/retrieve.py
+                - gateway/app/routes/receipts.py
+                - gateway/app/routes/attest.py
+                - gateway/app/routes/wallets.py
+                - gateway/app/routes/operators.py
+                - gateway/app/routes/locker_routes.py
+                - gateway/app/routes/lockers_v1.py
+                - gateway/app/routes/merkle_proof.py
+                - gateway/app/routes/verification_bundle.py
+                - gateway/app/routes/self_verify.py
+                - gateway/app/routes/recompute_verify.py
+                - gateway/app/routes/owner.py
+                - gateway/app/routes/public_file.py
+                - gateway/app/routes/short_url.py
+                - gateway/app/routes/sandbox_ingest.py
+                - gateway/app/routes/agent.py
+                - gateway/app/routes/agent_logger.py
+                - gateway/app/routes/agent_knowledge/
+                - gateway/app/routes/trichat.py
+                - gateway/app/routes/well_known.py
+                - gateway/app/routes/internal.py
+                - gateway/app/routes/jobs.py
+
+            switchboard_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: claude-opus-4-5
+              provider: anthropic
+              description: >
+                Expert on the gateway switchboard — job definitions for
+                payment processing and attestation, plus the Arweave
+                sidecar infrastructure.
+              system_prompt: >
+                You are the expert on the Nukez gateway's switchboard
+                and infrastructure components. Document the job definitions,
+                payment processing workflows (402 protocol), attestation
+                jobs, and the Arweave sidecar deployment.
+              key_files:
+                - gateway/switchboard/
+                - gateway/infra/arweave-sidecar/
+                - gateway/contracts/
+                - gateway/scripts/
+
+            app_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: claude-sonnet-4-20250514
+              provider: anthropic
+              description: >
+                Expert on the gateway application surface — FastAPI setup,
+                request/response schemas, middleware, and top-level
+                configuration. Covers gateway/app/ excluding core/ and routes/.
+              system_prompt: >
+                You are the expert on the Nukez gateway's FastAPI application
+                layer. Document the app initialization, schema definitions,
+                middleware chain, and how routes and core modules are wired
+                together. You cover the app surface — not the route handlers
+                (routes_expert has those) and not the core logic (core_expert
+                has that).
+              key_files:
+                - gateway/__init__.py
+                - gateway/app/__init__.py
+                - gateway/app/main.py
+                - gateway/app/schemas.py
+                - Dockerfile
+                - Makefile
+                - pyproject.toml
+                - env.deploy.yaml
+                - README.md
+
+            core_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: claude-opus-4-6
+              provider: anthropic
+              description: >
+                Expert on the gateway core — storage providers, auth/crypto,
+                chain operations, payments, merkle trees, receipts, and
+                all internal logic modules. The heaviest domain.
+              system_prompt: >
+                You are the expert on the Nukez gateway's core modules.
+                This is the heart of the system: 10 storage provider
+                backends, Ed25519 signature verification, Solana and EVM
+                chain operations, the merkle proof system, receipt
+                generation, the pricing engine, rate limiting, and security.
+                Document every module's public interface, data flow, and
+                integration points with precision.
+              key_files:
+                - gateway/app/core/__init__.py
+                - gateway/app/core/storage.py
+                - gateway/app/core/storage_pending.py
+                - gateway/app/core/file_ops.py
+                - gateway/app/core/signed_requests.py
+                - gateway/app/core/sigverify.py
+                - gateway/app/core/crypto.py
+                - gateway/app/core/security.py
+                - gateway/app/core/merkle.py
+                - gateway/app/core/receipts.py
+                - gateway/app/core/receipt_proof.py
+                - gateway/app/core/attest.py
+                - gateway/app/core/attest_jwt.py
+                - gateway/app/core/attestations.py
+                - gateway/app/core/payments.py
+                - gateway/app/core/evm_payments.py
+                - gateway/app/core/evm_rpc.py
+                - gateway/app/core/evm_tokens.py
+                - gateway/app/core/evm_keystore.py
+                - gateway/app/core/chain_utils.py
+                - gateway/app/core/bridge.py
+                - gateway/app/core/solana_keypair.py
+                - gateway/app/core/sol_price.py
+                - gateway/app/core/wallets.py
+                - gateway/app/core/jwt.py
+                - gateway/app/core/rate_limit.py
+                - gateway/app/core/ssrf.py
+                - gateway/app/core/nonce_store.py
+                - gateway/app/core/upload_tokens.py
+                - gateway/app/core/upload_error_taxonomy.py
+                - gateway/app/core/event_log.py
+                - gateway/app/core/fingerprint.py
+                - gateway/app/core/jobs.py
+                - gateway/app/core/metrics.py
+                - gateway/app/core/observability.py
+                - gateway/app/core/logging_config.py
+                - gateway/app/core/settings.py
+                - gateway/app/core/short_url.py
+                - gateway/app/core/sandbox_ingest.py
+                - gateway/app/core/owner_viewer.py
+                - gateway/app/core/treasury_ledger.py
+                - gateway/app/core/task_queue.py
+                - gateway/app/core/facilitator/
+                - gateway/app/core/meta_store/
+                - gateway/app/core/pricing/
+                - gateway/app/core/storage_providers/
+                - tests/
+
+        # ── Twin B: Grok Team ────────────────────────────────
+        grok_team:
+          type: coordinator
+          model: grok-4-1-fast-reasoning
+          provider: xai
+          twin: opus_team
+          description: >
+            Grok-led analysis team for the Nukez gateway. Identical
+            sub-agents as opus_team. Cross-pollination produces
+            independent analysis for reconciliation.
+          routing_prompt_extra: |
+            You lead the Grok analysis team for gateway documentation.
+            Route questions to the appropriate sub-agent by domain:
+            - **routes_expert**: All HTTP route handlers (gateway/app/routes/)
+            - **switchboard_expert**: Job definitions and switchboard config
+            - **app_expert**: FastAPI application setup, schemas, middleware
+            - **core_expert**: All core logic — storage, auth, chain, payments
+
+            For broad architectural questions, query all four subs and
+            synthesize. For specific module questions, route to the
+            domain expert. Bring your reasoning strength to bear on
+            identifying architectural patterns and edge cases.
+
+          agents:
+            routes_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: gpt-5.4
+              provider: openai
+              description: >
+                Expert on gateway route handlers — 25+ endpoint modules
+                covering storage, files, receipts, attestation, wallets,
+                operators, verification, and the agent knowledge system.
+              system_prompt: >
+                You are the expert on the Nukez gateway's route handlers.
+                You know every endpoint, its HTTP method, path, auth
+                requirements, request/response schemas, and error codes.
+                Document each route module precisely with examples.
+              key_files:
+                - gateway/app/routes/__init__.py
+                - gateway/app/routes/storage.py
+                - gateway/app/routes/storage_request.py
+                - gateway/app/routes/storage_confirm.py
+                - gateway/app/routes/files.py
+                - gateway/app/routes/retrieve.py
+                - gateway/app/routes/receipts.py
+                - gateway/app/routes/attest.py
+                - gateway/app/routes/wallets.py
+                - gateway/app/routes/operators.py
+                - gateway/app/routes/locker_routes.py
+                - gateway/app/routes/lockers_v1.py
+                - gateway/app/routes/merkle_proof.py
+                - gateway/app/routes/verification_bundle.py
+                - gateway/app/routes/self_verify.py
+                - gateway/app/routes/recompute_verify.py
+                - gateway/app/routes/owner.py
+                - gateway/app/routes/public_file.py
+                - gateway/app/routes/short_url.py
+                - gateway/app/routes/sandbox_ingest.py
+                - gateway/app/routes/agent.py
+                - gateway/app/routes/agent_logger.py
+                - gateway/app/routes/agent_knowledge/
+                - gateway/app/routes/trichat.py
+                - gateway/app/routes/well_known.py
+                - gateway/app/routes/internal.py
+                - gateway/app/routes/jobs.py
+
+            switchboard_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: claude-opus-4-5
+              provider: anthropic
+              description: >
+                Expert on the gateway switchboard — job definitions for
+                payment processing and attestation, plus the Arweave
+                sidecar infrastructure.
+              system_prompt: >
+                You are the expert on the Nukez gateway's switchboard
+                and infrastructure components. Document the job definitions,
+                payment processing workflows (402 protocol), attestation
+                jobs, and the Arweave sidecar deployment.
+              key_files:
+                - gateway/switchboard/
+                - gateway/infra/arweave-sidecar/
+                - gateway/contracts/
+                - gateway/scripts/
+
+            app_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: claude-sonnet-4-20250514
+              provider: anthropic
+              description: >
+                Expert on the gateway application surface — FastAPI setup,
+                request/response schemas, middleware, and top-level
+                configuration. Covers gateway/app/ excluding core/ and routes/.
+              system_prompt: >
+                You are the expert on the Nukez gateway's FastAPI application
+                layer. Document the app initialization, schema definitions,
+                middleware chain, and how routes and core modules are wired
+                together. You cover the app surface — not the route handlers
+                (routes_expert has those) and not the core logic (core_expert
+                has that).
+              key_files:
+                - gateway/__init__.py
+                - gateway/app/__init__.py
+                - gateway/app/main.py
+                - gateway/app/schemas.py
+                - Dockerfile
+                - Makefile
+                - pyproject.toml
+                - env.deploy.yaml
+                - README.md
+
+            core_expert:
+              repo_path: /Users/zhanson/Desktop/Nukez
+              model: claude-opus-4-6
+              provider: anthropic
+              description: >
+                Expert on the gateway core — storage providers, auth/crypto,
+                chain operations, payments, merkle trees, receipts, and
+                all internal logic modules. The heaviest domain.
+              system_prompt: >
+                You are the expert on the Nukez gateway's core modules.
+                This is the heart of the system: 10 storage provider
+                backends, Ed25519 signature verification, Solana and EVM
+                chain operations, the merkle proof system, receipt
+                generation, the pricing engine, rate limiting, and security.
+                Document every module's public interface, data flow, and
+                integration points with precision.
+              key_files:
+                - gateway/app/core/__init__.py
+                - gateway/app/core/storage.py
+                - gateway/app/core/storage_pending.py
+                - gateway/app/core/file_ops.py
+                - gateway/app/core/signed_requests.py
+                - gateway/app/core/sigverify.py
+                - gateway/app/core/crypto.py
+                - gateway/app/core/security.py
+                - gateway/app/core/merkle.py
+                - gateway/app/core/receipts.py
+                - gateway/app/core/receipt_proof.py
+                - gateway/app/core/attest.py
+                - gateway/app/core/attest_jwt.py
+                - gateway/app/core/attestations.py
+                - gateway/app/core/payments.py
+                - gateway/app/core/evm_payments.py
+                - gateway/app/core/evm_rpc.py
+                - gateway/app/core/evm_tokens.py
+                - gateway/app/core/evm_keystore.py
+                - gateway/app/core/chain_utils.py
+                - gateway/app/core/bridge.py
+                - gateway/app/core/solana_keypair.py
+                - gateway/app/core/sol_price.py
+                - gateway/app/core/wallets.py
+                - gateway/app/core/jwt.py
+                - gateway/app/core/rate_limit.py
+                - gateway/app/core/ssrf.py
+                - gateway/app/core/nonce_store.py
+                - gateway/app/core/upload_tokens.py
+                - gateway/app/core/upload_error_taxonomy.py
+                - gateway/app/core/event_log.py
+                - gateway/app/core/fingerprint.py
+                - gateway/app/core/jobs.py
+                - gateway/app/core/metrics.py
+                - gateway/app/core/observability.py
+                - gateway/app/core/logging_config.py
+                - gateway/app/core/settings.py
+                - gateway/app/core/short_url.py
+                - gateway/app/core/sandbox_ingest.py
+                - gateway/app/core/owner_viewer.py
+                - gateway/app/core/treasury_ledger.py
+                - gateway/app/core/task_queue.py
+                - gateway/app/core/facilitator/
+                - gateway/app/core/meta_store/
+                - gateway/app/core/pricing/
+                - gateway/app/core/storage_providers/
+                - tests/
+
+    files:
+      type: files
+      watched_paths:
+        - /Users/zhanson/x/multiagentz/outputs/

@@ -1,0 +1,686 @@
+# yaml-language-server: $schema=
+name: master-docs
+
+# ============================================================
+# Master Documentation Generator — Nukez Ecosystem
+# ============================================================
+# Generates Architecture Overview + API Reference + Integration
+# Guide for ONE Nukez repo at a time, with cross-reference
+# access to the other three repos for ecosystem consistency.
+#
+# ┌─────────────────────────────────────────────────────────┐
+# │  HOW TO ROTATE                                          │
+# │                                                         │
+# │  1. Change FOCUS_REPO in the lead routing_prompt_extra  │
+# │     to the team you want to document:                   │
+# │                                                         │
+# │       pynukez_team    → Python SDK (pynukez)            │
+# │       mcp_team        → MCP Server (nukez-mcp)          │
+# │       agent_team      → Autonomous Agent (nukez_agent)  │
+# │       gateway_team    → Gateway API (Nukez gateway)     │
+# │                                                         │
+# │  2. Run:                                                │
+# │       maz --config stacks/master_docs.yaml              │
+# │       > Generate comprehensive documentation            │
+# │                                                         │
+# │  Recommended order (dependency chain):                  │
+# │    1. pynukez_team   (foundational SDK, no deps)        │
+# │    2. mcp_team       (wraps pynukez)                    │
+# │    3. agent_team     (consumes gateway + pynukez)       │
+# │    4. gateway_team   (the core, references all)         │
+# └─────────────────────────────────────────────────────────┘
+#
+# Architecture (13 agents total):
+#   Lead (Opus 4.6)
+#     → pynukez_team (Coordinator, Opus 4.6)
+#       → sdk_expert (gpt-5.4)
+#     → mcp_team (Coordinator, Opus 4.6)
+#       → mcp_expert (gpt-5.4)
+#     → agent_team (Coordinator, Opus 4.6)
+#       → agent_expert (gpt-5.4)
+#       → infra_expert (Sonnet 4)
+#     → gateway_team (Coordinator, Opus 4.6)
+#       → routes_expert (gpt-5.4)
+#       → switchboard_expert (Opus 4.5)
+#       → app_expert (Sonnet 4)
+#       → core_expert (Opus 4.6)
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    # ═══════════════════════════════════════════════════════════
+    # FOCUS REPO — Change this value to rotate documentation target
+    # Options: pynukez_team | mcp_team | agent_team | gateway_team
+    # ═══════════════════════════════════════════════════════════
+    FOCUS_REPO: pynukez_team
+
+    You are orchestrating comprehensive documentation generation for the
+    Nukez decentralized storage ecosystem. You have four documentation
+    teams, each covering one repository in the stack. Your PRIMARY
+    objective is to generate documentation for the FOCUS_REPO above.
+
+    ## Your Teams
+
+    **pynukez_team** — Python SDK (pynukez v3.1.0). 40+ storage methods,
+    Ed25519 auth/signing (Keypair, build_signed_envelope), type system
+    (Receipt, FileUrls, FileInfo), payment flows (SOL + EVM), HTTP
+    internals, error taxonomy. The foundational client library that all
+    other repos depend on.
+
+    **mcp_team** — MCP server (nukez-mcp v1.1.0). 8 thick tools for LLM
+    hosts (Claude Desktop, Cursor), FastMCP transport (stdio, SSE), state
+    management, memory system, keypair resolution cascade. Wraps pynukez
+    into the Model Context Protocol.
+
+    **agent_team** — Autonomous agent (nukez_agent). LLM-driven tool
+    execution loop, payment handling, phase 2 capabilities, nukez_client
+    wrapper, contract validation, OpenAPI tooling. Calls the gateway API
+    directly using pynukez.
+
+    **gateway_team** — Core gateway service (api.nukez.xyz). 25+ route
+    handlers, 10 storage provider backends, Solana/EVM chain integration,
+    merkle proofs, pricing engine, JWT auth, agent knowledge system, rate
+    limiting, SSRF protection. The server that all clients talk to.
+
+    ## Routing Strategy
+
+    Route **80%+** of your queries to the FOCUS_REPO team. They own the
+    primary documentation output.
+
+    Route to the other three teams ONLY when you need to:
+    - Verify how the focus repo integrates with another component
+    - Check API contracts between repos (e.g., pynukez ↔ gateway)
+    - Ensure cross-repo consistency in terminology and type names
+    - Understand the focus repo's upstream/downstream dependencies
+    - Confirm a claim about another repo's behavior
+
+    When cross-referencing, be specific: "Does the gateway's /v1/store
+    endpoint expect the signed envelope format described by pynukez's
+    build_signed_envelope?" — not vague open-ended queries.
+
+    ## Documentation Output
+
+    Produce three sections for the FOCUS_REPO:
+
+    1. **Architecture Overview** — How components fit together, data flow,
+       key design decisions, dependency relationships. Written for someone
+       who needs to understand the repo before using it. Include how it
+       relates to the broader Nukez ecosystem.
+
+    2. **API Reference** — Every public class, method, function, and
+       constant. Include: signature, parameters with types, return types,
+       exceptions raised, and a brief usage example for each. Organized
+       by module.
+
+    3. **Integration Guide** — Task-oriented: how to install, configure,
+       and use in common scenarios. Include quickstart, cookbook patterns,
+       gotchas, and best practices. Reference the other Nukez repos
+       where integration patterns cross repo boundaries.
+
+    ## Prior Documentation (Cross-Run Context)
+
+    Before generating documentation, query the **prior_docs** agent:
+    "List all available prior documentation files."
+
+    If prior docs exist for other repos (from earlier runs in the
+    sequence), use them as ground truth for cross-referencing instead
+    of querying the other teams. This is faster and more accurate —
+    you're validating against finalized documentation rather than
+    regenerating analysis.
+
+    Example: during the mcp_team focus run, if pynukez docs exist in
+    prior_docs, reference them directly when documenting how nukez-mcp
+    wraps pynukez methods. Only fall back to querying pynukez_team if
+    the prior docs don't cover the specific detail you need.
+
+    Priority order for cross-referencing:
+    1. Prior docs (if available) — read and validate against them
+    2. Direct team query — only for gaps not covered by prior docs
+
+    After your final synthesis, remind the user to save the output:
+    "Save this output to outputs/docs/docs_[repo_name].md for use
+    by subsequent runs."
+
+    ## Refinement Criteria (Iteration 2)
+
+    When reviewing your first-pass output to generate feedback for
+    the refinement iteration, focus on these specific criteria:
+
+    1. **API completeness** — Are there public methods, classes, or
+       constants in the codebase that are missing from the API Reference?
+       Cross-check against the sub-agent's file listings.
+    2. **Cross-repo accuracy** — Do claims about how this repo integrates
+       with other Nukez repos match reality? Verify type names, method
+       signatures, and endpoint contracts against prior docs or team queries.
+    3. **Type name consistency** — Are Receipt, FileUrls, FileInfo, Keypair,
+       and other shared types spelled and described identically across all
+       three sections?
+    4. **Example correctness** — Do code examples use real method signatures
+       with correct parameter types and return values?
+
+    Do NOT waste refinement on cosmetic edits (rewording, reformatting).
+    Focus on factual gaps and errors.
+
+    ## Per-Focus Objectives
+
+    **When FOCUS_REPO = pynukez_team:**
+    - The Nukez client class and its 40+ storage methods
+    - Ed25519 auth model: Keypair, build_signed_envelope, compute_locker_id
+    - Type system: Receipt, FileUrls, FileInfo, etc.
+    - Payment flows: SOL (Solana) + EVM chains (evm_payment.py)
+    - Security hardening (hardening.py), HTTP internals (_http.py)
+    - Error taxonomy (errors.py), discovery (discovery.py)
+    - Integration patterns with LLM frameworks (docs/integrations/)
+    - Cross-ref: ask gateway_team to confirm API contracts pynukez calls
+
+    **When FOCUS_REPO = mcp_team:**
+    - 8 thick MCP tools and their implementations (thick_tools.py)
+    - FastMCP server config, transport modes (stdio, SSE)
+    - State management (state.py, state_backend.py), persistence
+    - Memory operations (memory.py) — structured key-value storage
+    - Tool manifest definitions (tool_manifest.py)
+    - Bundled pynukez SDK and auth cascade (server.py L99-113)
+    - Keypair resolution: env var → file path → generate
+    - Docker deployment (Dockerfile, entrypoint.py)
+    - Cross-ref: ask pynukez_team about the SDK methods MCP wraps
+
+    **When FOCUS_REPO = agent_team:**
+    - Autonomous agent main loop (autonomous_agent/main.py)
+    - LLM integration and tool execution (llm.py, tool_executor.py)
+    - Payment handling (payment.py), debug scripts
+    - Phase 2 agent capabilities (phase2_agent.py)
+    - nukez_client wrapper (nukez_client/)
+    - Contract validation, OpenAPI tooling (tooling/)
+    - Configuration via settings.yaml
+    - Cross-ref: ask gateway_team about the API the agent calls,
+      ask pynukez_team about the SDK it wraps
+
+    **When FOCUS_REPO = gateway_team:**
+    - 25+ route handlers serving the REST API
+    - 10 storage provider backends (GCS, Azure, MongoDB, Storj, etc.)
+    - Solana and EVM chain integration (payments, attestation, bridging)
+    - Ed25519 signed request verification
+    - Merkle proof generation and verification
+    - Pricing engine with cost calculation and quoting
+    - JWT auth, API key management, rate limiting
+    - Agent knowledge base (14 markdown documents)
+    - SSRF protection, security hardening
+    - Cross-ref: ask pynukez_team about client-side contract expectations,
+      ask agent_team about autonomous agent integration points
+
+  # Keywords: repo-specific discriminators only.
+  # Generic terms (documentation, architecture, code, module, etc.) are
+  # omitted — the FOCUS_REPO directive handles routing, these are just
+  # fallback tiebreakers for ambiguous queries.
+  keywords:
+    pynukez_team:
+      - pynukez
+      - sdk
+      - client
+      - keypair
+      - signing
+      - envelope
+      - build_signed_envelope
+      - compute_locker_id
+      - hardening
+      - discovery
+      - _http
+      - errors.py
+
+    mcp_team:
+      - mcp
+      - fastmcp
+      - thick
+      - thick_tools
+      - tool_manifest
+      - stdio
+      - cursor
+      - claude_desktop
+      - state_backend
+      - entrypoint
+      - diagnostics
+
+    agent_team:
+      - autonomous
+      - nukez_client
+      - tool_executor
+      - phase2
+      - phase2_agent
+      - fetcher
+      - llm.py
+      - openapi
+      - settings.yaml
+      - AGENT_BRIEFING
+
+    gateway_team:
+      - gateway
+      - switchboard
+      - attestation
+      - attest
+      - merkle
+      - meta_store
+      - storage_providers
+      - pricing
+      - evm_payments
+      - solana_keypair
+      - ssrf
+      - facilitator
+      - treasury_ledger
+
+    prior_docs:
+      - prior
+      - previous
+      - earlier
+      - existing docs
+      - already generated
+      - cross-run
+
+  agents:
+    # ══════════════════════════════════════════════════════════
+    # Team 1: PyNukez SDK
+    # ══════════════════════════════════════════════════════════
+    pynukez_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Documentation team for the pynukez Python SDK (v3.1.0). The
+        foundational client library for the Nukez ecosystem. Covers the
+        Nukez client class (40+ methods), Ed25519 auth/signing, type
+        system, payment flows, HTTP internals, and error taxonomy.
+      routing_prompt_extra: |
+        You oversee documentation generation for the pynukez SDK.
+        Route all questions to the sdk_expert — it has full context
+        on the codebase. Review its responses for completeness and
+        accuracy before passing them up to the lead.
+
+        If you receive a narrow cross-reference query from the lead
+        (e.g., confirming a method signature or type name for another
+        repo's docs), answer directly and concisely. Do not generate
+        full documentation sections — just the specific fact requested.
+
+      agents:
+        sdk_expert:
+          repo_path: /Users/zhanson/pynukez
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Definitive expert on the pynukez SDK. Has full read access to
+            all source code, tests, documentation, and examples. Produces
+            detailed analysis, API documentation, and usage guidance.
+          system_prompt: >
+            You are the definitive expert on the pynukez Python SDK (v3.1.0).
+            You have read every source file, test, and example. When asked
+            about any aspect of the SDK, provide precise, code-grounded
+            answers with exact method signatures, parameter types, and
+            return values. Reference specific files and line numbers when
+            relevant. Your documentation should be authoritative enough
+            to serve as the official reference.
+          key_files:
+            - pynukez/__init__.py
+            - pynukez/client.py
+            - pynukez/auth.py
+            - pynukez/types.py
+            - pynukez/_http.py
+            - pynukez/errors.py
+            - pynukez/payment.py
+            - pynukez/evm_payment.py
+            - pynukez/hardening.py
+            - pynukez/discovery.py
+            - docs/API.md
+            - docs/QUICKSTART.md
+            - docs/TOOL_PATTERN.md
+            - docs/integrations/
+            - examples/
+            - tests/
+            - README.md
+            - pyproject.toml
+
+    # ══════════════════════════════════════════════════════════
+    # Team 2: Nukez MCP Server
+    # ══════════════════════════════════════════════════════════
+    mcp_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Documentation team for nukez-mcp (v1.1.0) — the MCP server that
+        exposes Nukez storage as 8 thick tools for LLM hosts like Claude
+        Desktop and Cursor. Covers tools, state management, memory system,
+        transport modes, and Docker deployment.
+      routing_prompt_extra: |
+        You oversee documentation generation for the nukez-mcp server.
+        Route all questions to the mcp_expert. Review its responses for
+        completeness — every thick tool must be documented with its full
+        parameter schema, return format, and error cases.
+
+        If you receive a narrow cross-reference query from the lead
+        (e.g., confirming a tool schema or state transition for another
+        repo's docs), answer directly and concisely. Do not generate
+        full documentation sections — just the specific fact requested.
+
+      agents:
+        mcp_expert:
+          repo_path: /Users/zhanson/nukez-mcp
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Definitive expert on the Nukez MCP server implementation.
+            Has full read access to the server code, thick tools, state
+            management, memory system, tool manifest, diagnostics, and
+            the bundled pynukez SDK.
+          system_prompt: >
+            You are the definitive expert on nukez-mcp (v1.1.0) — the MCP
+            server that exposes Nukez decentralized storage as thick tools
+            for LLM hosts. You know every tool definition, every state
+            transition, every error path. When documenting tools, include
+            the exact parameter schemas from tool_manifest.py and the
+            implementation logic from thick_tools.py. Reference the
+            keypair resolution cascade in server.py. Your documentation
+            should enable any developer to configure and use this MCP
+            server without reading the source code.
+          key_files:
+            - nukez_mcp/__init__.py
+            - nukez_mcp/__main__.py
+            - nukez_mcp/server.py
+            - nukez_mcp/thick_tools.py
+            - nukez_mcp/tool_manifest.py
+            - nukez_mcp/memory.py
+            - nukez_mcp/state.py
+            - nukez_mcp/state_backend.py
+            - nukez_mcp/tests/
+            - pynukez/auth.py
+            - pynukez/client.py
+            - pynukez/types.py
+            - diagnostics/
+            - entrypoint.py
+            - Dockerfile
+            - pyproject.toml
+            - README.md
+
+    # ══════════════════════════════════════════════════════════
+    # Team 3: NukezAgent (Autonomous)
+    # ══════════════════════════════════════════════════════════
+    agent_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Documentation team for nukez_agent — the autonomous agent that
+        performs storage operations via LLM-driven tool execution, payment
+        handling, and multi-phase agent workflows. Covers the agent core
+        and the client/tooling infrastructure.
+      routing_prompt_extra: |
+        You oversee documentation for the nukez_agent autonomous agent.
+        Two sub-agents cover different domains:
+        - **agent_expert**: Core agent — main loop, LLM integration,
+          tool execution, payment, phase 2 capabilities.
+        - **infra_expert**: nukez_client wrapper, tooling contracts,
+          OpenAPI specs, bootstrap/debug scripts.
+
+        Route questions about the agent's runtime behavior, LLM calls,
+        and payment to agent_expert. Route questions about client config,
+        contracts, and tooling to infra_expert. For architectural questions
+        that span both, query both and synthesize.
+
+        If you receive a narrow cross-reference query from the lead
+        (e.g., confirming an API the agent calls or a config key for
+        another repo's docs), answer directly and concisely. Do not
+        generate full documentation sections — just the specific fact
+        requested.
+
+      agents:
+        agent_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Expert on the autonomous agent core — the main execution loop,
+            LLM-driven tool selection, payment handling, data fetching,
+            logging, and the phase 2 agent design.
+          system_prompt: >
+            You are the expert on the nukez_agent autonomous agent.
+            You know the main loop, how it calls the LLM to select tools,
+            how tool_executor.py dispatches operations, how payment.py
+            handles transactions, and how phase2_agent.py extends the
+            base capabilities. Ground every answer in the actual code.
+          key_files:
+            - autonomous_agent/__init__.py
+            - autonomous_agent/main.py
+            - autonomous_agent/llm.py
+            - autonomous_agent/tool_executor.py
+            - autonomous_agent/fetcher.py
+            - autonomous_agent/payment.py
+            - autonomous_agent/logger.py
+            - autonomous_agent/phase2_agent.py
+            - autonomous_agent/test_contracts.py
+            - autonomous_agent/test_phase2_integration.py
+            - autonomous_agent/test_autonomous_discovery.py
+            - main.py
+            - config/settings.yaml
+            - docs/AGENT_BRIEFING.md
+
+        infra_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on nukez_agent infrastructure — nukez_client wrapper,
+            tooling contracts, OpenAPI specifications, bootstrap and
+            debugging scripts.
+          system_prompt: >
+            You are the expert on the nukez_agent infrastructure layer:
+            the nukez_client wrapper, the tooling directory with OpenAPI
+            contracts and tool definitions, and the scripts for bootstrapping,
+            validation, and debugging. Ground every answer in the code.
+          key_files:
+            - nukez_client/__init__.py
+            - nukez_client/client.py
+            - nukez_client/config.py
+            - nukez_client/llm_factory.py
+            - tooling/
+            - scripts/
+            - docs/VERIFICATION_GUIDE.md
+            - requirements.txt
+            - pyproject.toml
+            - README.md
+
+    # ══════════════════════════════════════════════════════════
+    # Team 4: Nukez Gateway
+    # ══════════════════════════════════════════════════════════
+    gateway_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      max_workers: 8
+      description: >
+        Documentation team for the Nukez gateway (api.nukez.xyz) — the
+        core FastAPI service. 25+ route handlers, 10 storage providers,
+        Solana/EVM chain integration, merkle proofs, pricing engine,
+        JWT auth, agent knowledge system, and security hardening.
+      routing_prompt_extra: |
+        You oversee documentation for the Nukez gateway — the largest
+        and most complex repository in the ecosystem.
+        Four sub-agents cover different domains:
+        - **routes_expert**: All HTTP route handlers (gateway/app/routes/)
+        - **switchboard_expert**: Job definitions and switchboard config
+        - **app_expert**: FastAPI application setup, schemas, middleware
+        - **core_expert**: All core logic — storage, auth, chain, payments
+
+        For broad architectural questions, query all four subs and
+        synthesize. For specific module questions, route to the
+        domain expert.
+
+        If you receive a narrow cross-reference query from the lead
+        (e.g., confirming an endpoint contract or response schema for
+        another repo's docs), answer directly and concisely. Route to
+        the single relevant sub-agent only — do not fan out to all four.
+        Do not generate full documentation sections — just the specific
+        fact requested.
+
+      agents:
+        routes_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Expert on gateway route handlers — 25+ endpoint modules
+            covering storage, files, receipts, attestation, wallets,
+            operators, verification, and the agent knowledge system.
+          system_prompt: >
+            You are the expert on the Nukez gateway's route handlers.
+            You know every endpoint, its HTTP method, path, auth
+            requirements, request/response schemas, and error codes.
+            Document each route module precisely with examples.
+          key_files:
+            - gateway/app/routes/__init__.py
+            - gateway/app/routes/storage.py
+            - gateway/app/routes/storage_request.py
+            - gateway/app/routes/storage_confirm.py
+            - gateway/app/routes/files.py
+            - gateway/app/routes/retrieve.py
+            - gateway/app/routes/receipts.py
+            - gateway/app/routes/attest.py
+            - gateway/app/routes/wallets.py
+            - gateway/app/routes/operators.py
+            - gateway/app/routes/locker_routes.py
+            - gateway/app/routes/lockers_v1.py
+            - gateway/app/routes/merkle_proof.py
+            - gateway/app/routes/verification_bundle.py
+            - gateway/app/routes/self_verify.py
+            - gateway/app/routes/recompute_verify.py
+            - gateway/app/routes/owner.py
+            - gateway/app/routes/public_file.py
+            - gateway/app/routes/short_url.py
+            - gateway/app/routes/sandbox_ingest.py
+            - gateway/app/routes/agent.py
+            - gateway/app/routes/agent_logger.py
+            - gateway/app/routes/agent_knowledge/
+            - gateway/app/routes/trichat.py
+            - gateway/app/routes/well_known.py
+            - gateway/app/routes/internal.py
+            - gateway/app/routes/jobs.py
+
+        switchboard_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-opus-4-5
+          provider: anthropic
+          description: >
+            Expert on the gateway switchboard — job definitions for
+            payment processing and attestation, plus the Arweave
+            sidecar infrastructure.
+          system_prompt: >
+            You are the expert on the Nukez gateway's switchboard
+            and infrastructure components. Document the job definitions,
+            payment processing workflows (402 protocol), attestation
+            jobs, and the Arweave sidecar deployment.
+          key_files:
+            - gateway/switchboard/
+            - gateway/infra/arweave-sidecar/
+            - gateway/contracts/
+            - gateway/scripts/
+
+        app_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on the gateway application surface — FastAPI setup,
+            request/response schemas, middleware, and top-level
+            configuration.
+          system_prompt: >
+            You are the expert on the Nukez gateway's FastAPI application
+            layer. Document the app initialization, schema definitions,
+            middleware chain, and how routes and core modules are wired
+            together. You cover the app surface — not the route handlers
+            (routes_expert) and not the core logic (core_expert).
+          key_files:
+            - gateway/__init__.py
+            - gateway/app/__init__.py
+            - gateway/app/main.py
+            - gateway/app/schemas.py
+            - Dockerfile
+            - Makefile
+            - pyproject.toml
+            - env.deploy.yaml
+            - README.md
+
+        core_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Expert on the gateway core — storage providers, auth/crypto,
+            chain operations, payments, merkle trees, receipts, and
+            all internal logic modules. The heaviest domain.
+          system_prompt: >
+            You are the expert on the Nukez gateway's core modules.
+            This is the heart of the system: 10 storage provider
+            backends, Ed25519 signature verification, Solana and EVM
+            chain operations, the merkle proof system, receipt
+            generation, the pricing engine, rate limiting, and security.
+            Document every module's public interface, data flow, and
+            integration points with precision.
+          key_files:
+            - gateway/app/core/__init__.py
+            - gateway/app/core/storage.py
+            - gateway/app/core/storage_pending.py
+            - gateway/app/core/file_ops.py
+            - gateway/app/core/signed_requests.py
+            - gateway/app/core/sigverify.py
+            - gateway/app/core/crypto.py
+            - gateway/app/core/security.py
+            - gateway/app/core/merkle.py
+            - gateway/app/core/receipts.py
+            - gateway/app/core/receipt_proof.py
+            - gateway/app/core/attest.py
+            - gateway/app/core/attest_jwt.py
+            - gateway/app/core/attestations.py
+            - gateway/app/core/payments.py
+            - gateway/app/core/evm_payments.py
+            - gateway/app/core/evm_rpc.py
+            - gateway/app/core/evm_tokens.py
+            - gateway/app/core/evm_keystore.py
+            - gateway/app/core/chain_utils.py
+            - gateway/app/core/bridge.py
+            - gateway/app/core/solana_keypair.py
+            - gateway/app/core/sol_price.py
+            - gateway/app/core/wallets.py
+            - gateway/app/core/jwt.py
+            - gateway/app/core/rate_limit.py
+            - gateway/app/core/ssrf.py
+            - gateway/app/core/nonce_store.py
+            - gateway/app/core/upload_tokens.py
+            - gateway/app/core/upload_error_taxonomy.py
+            - gateway/app/core/event_log.py
+            - gateway/app/core/fingerprint.py
+            - gateway/app/core/jobs.py
+            - gateway/app/core/metrics.py
+            - gateway/app/core/observability.py
+            - gateway/app/core/logging_config.py
+            - gateway/app/core/settings.py
+            - gateway/app/core/short_url.py
+            - gateway/app/core/sandbox_ingest.py
+            - gateway/app/core/owner_viewer.py
+            - gateway/app/core/treasury_ledger.py
+            - gateway/app/core/task_queue.py
+            - gateway/app/core/facilitator/
+            - gateway/app/core/meta_store/
+            - gateway/app/core/pricing/
+            - gateway/app/core/storage_providers/
+            - tests/
+
+    # ══════════════════════════════════════════════════════════
+    # Prior Documentation (cross-run context)
+    # ══════════════════════════════════════════════════════════
+    prior_docs:
+      type: files
+      watched_paths:
+        - /Users/zhanson/x/multiagentz/outputs/docs/

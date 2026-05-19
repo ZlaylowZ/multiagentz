@@ -1,0 +1,775 @@
+# yaml-language-server: $schema=
+name: analyze-nukez-value-chain
+
+# ============================================================
+# Nukez Value Chain Analysis
+# ============================================================
+# Identifies every explicit and implicit responsibility that
+# Nukez handles on behalf of agents and users — from the
+# foundational HTTP API (Gateway) through the PyNukez SDK,
+# the MCP server, and up to the autonomous NukezAgent.
+#
+# The analysis is NOT a feature list. It is an operational
+# decomposition: what effort, knowledge, infrastructure,
+# configuration, and maintenance is absorbed at each layer,
+# and how the value compounds multiplicatively as one
+# ascends the stack.
+#
+# Architecture (8 agents):
+#   Lead (Opus 4.6) — Value chain analyst + synthesizer
+#     → researcher (Opus 4.6) — Cloud infra context, implicit costs
+#     → analysis_team (Coordinator, Opus 4.6)
+#       → gateway_expert   (Opus 4.6)    — Nukez Gateway HTTP API
+#       → sdk_expert       (Opus 4.6)    — PyNukez Python SDK
+#       → mcp_expert       (Opus 4.6)    — Nukez MCP server
+#       → agent_expert     (Opus 4.6)    — NukezAgent service + AAAP SDK
+#
+# Consensus flow (iterative conflict resolution):
+#   1. All agents independently analyze the question
+#   2. Conflicts detected across agent responses
+#   3. Refinement questions generated for conflicting areas
+#   4. Agents refine answers incorporating other perspectives
+#   5. Lead synthesizes final deliverable from consensus
+#
+# The researcher agent provides external context on cloud
+# infrastructure costs, IAM complexity, and competing approaches
+# that pure codebase analysis would miss. This scopes the
+# "implicit value" dimension.
+#
+# Run:
+#   maz --config stacks/analyze_nukez_value_chain.yaml
+#   /perspective "[paste the analysis prompt]"
+# ============================================================
+
+orchestration:
+  mode: consensus
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    You are conducting a rigorous operational decomposition of the Nukez
+    ecosystem's value chain — identifying every responsibility (explicit
+    and implicit) that Nukez absorbs on behalf of agents and users.
+
+    ## Framing
+
+    This is NOT a feature list or marketing exercise. It is a pragmatic report and analyses 
+    of **work displaced** at each layer of the stack. The corollary is that it is each of these
+    "layers" are where value creation occurs, competitive positioning established, and the
+    business model solidified.
+    
+    For every responsibility identified, answer:
+    1. **What exactly is handled?** — The specific task or concern.
+    2. **What would the user/agent otherwise need to do?** — The effort,
+       knowledge, infrastructure, or ongoing maintenance required.
+    3. **At which layer is it absorbed?** — Gateway, PyNukez, MCP, or Agent.
+    4. **How does this compound with lower layers?** — The multiplicative
+       value when combined with what layers below already provide.
+    5. **Comparative Considersations** Time, effort, labor, financial, technical,
+    competence, risk (e.g., security hardening as a benefit), etc... that one has
+    to obtain or delegate, which TO BE SURE still requires a level of knowledge that
+    is not trivial and cannot be acquired merely by talking to an LLM, to the
+    relevant systems and designing process... Specifially, the economic and opportunity costs
+    of doing this oneself vs consuming the Nukez protocol which shall include cosiderations of
+    all kinds.
+
+    ## The Four Layers (bottom-up)
+
+    **Layer 0 — Nukez Gateway (api.nukez.xyz)**
+    The foundational HTTP API. Everything above depends on it.
+    Responsibilities to identify include but are not limited to:
+    - Cloud infrastructure: storage provider abstraction (10+ backends),
+      deployment, scaling, monitoring
+    - Billing & payments: Solana + EVM payment processing, pricing engine,
+      treasury ledger, 402 protocol
+    - Security: Ed25519 signature verification, JWT auth, API key management,
+      SSRF protection, rate limiting, nonce replay protection
+    - Cryptographic attestation: merkle proof generation, receipt chains,
+      on-chain bridging, Arweave sidecar
+    - IAM-equivalent: operator delegation, wallet management, locker
+      provisioning, access control
+    - Observability: event logging, metrics, structured logging
+
+    **Layer 1 — PyNukez SDK (pynukez)**
+    The Python client library. NOT merely endpoint wrappers.
+    Responsibilities to identify:
+    - Auth abstraction: Keypair management, signed envelope construction,
+      locker ID computation — the developer never touches raw crypto
+    - Type safety: Receipt, FileUrls, FileInfo — structured domain types
+      replacing raw JSON
+    - Payment orchestration: request_storage → confirm_storage flow
+      abstracted into method calls
+    - Error taxonomy: classified errors with retry hints
+    - HTTP resilience: retry logic, timeout handling in _http.py
+    - Zero-knowledge discovery: service discovery without leaking intent
+    - Security hardening: request validation in hardening.py
+
+    **Layer 2 — Nukez MCP (nukez-mcp)**
+    The MCP server exposing storage as thick tools for LLM hosts.
+    Responsibilities to identify:
+    - Tool packaging: 8 thick tools with parameter schemas and return types
+    - State management: persistent state across tool invocations
+    - Auth cascade: keypair resolution from environment
+    - Transport abstraction: stdio + SSE for different host environments
+    - Memory module: structured key-value storage for LLM contexts
+
+    **Layer 3 — NukezAgent (nukezAgent)**
+    The autonomous storage specialist sub-agent.
+    Responsibilities to identify:
+    - Intent translation: natural language → storage operations
+    - Signing boundary: the agent NEVER possesses owner keys, NEVER
+      executes crypto transfers — it orchestrates and returns sign_requests
+    - Operator delegation: routine ops use agent's own registered keypair
+    - Multi-transport: HTTP, MCP, A2A adapters over same core
+    - AAAP contracts: Context Envelope, typed Artifacts, capability schemas,
+      side effects, failure taxonomy
+    - Instance lifecycle: per-developer state, rate limiting
+    - Framework integration: CrewAI, LangGraph, AutoGen adapters
+    - Agent knowledge: 14 markdown documents for reasoning context
+    - Receipt-as-observability: receipt chain IS the trace, no separate system
+
+    ## Implicit / Non-Obvious Value
+
+    Route these questions to the **researcher** agent:
+    - What does it actually take to set up cloud storage infrastructure
+      from scratch? (IAM policies, billing alerts, provider selection,
+      egress cost management, compliance requirements)
+    - What does cryptographic attestation normally require? (HSMs, key
+      management services, audit trails, compliance frameworks)
+    - What is the real cost of multi-chain payment integration? (RPC nodes,
+      gas estimation, transaction monitoring, wallet security)
+    - What knowledge acquisition burden exists for a developer or agent
+      to replicate what each Nukez layer provides?
+
+    ## Your Teams
+
+    **researcher** — Provides external context on infrastructure costs,
+    IAM complexity, cloud setup burdens, and knowledge requirements that
+    pure codebase analysis cannot capture. Query this agent for the
+    "what would you otherwise need to do?" dimension.
+
+    **analysis_team** — Opus 4.6 coordinator team with 4 sub-agents
+    covering gateway, SDK, MCP, and agent. Consensus mode's iterative
+    conflict resolution ensures blind spots are caught through
+    refinement iterations.
+
+    ## Routing Strategy
+
+    1. Start with **researcher** for the implicit value context
+    2. Route layer-specific analysis to the analysis team
+    3. For cross-layer compounding questions, query the analysis team
+       and the researcher
+
+    Expected routing weight:
+    - analysis_team: ~70% (the core analysis)
+    - researcher: ~30% (infrastructure context and implicit value)
+
+    ## Output Format
+
+    Produce a structured deliverable with these sections:
+
+    ### 1. Executive Summary
+    One-paragraph thesis on the multiplicative value chain.
+
+    ### 2. Layer-by-Layer Decomposition
+    For each layer (Gateway → PyNukez → MCP → NukezAgent):
+    - **Explicit responsibilities** — What the code demonstrably handles,
+      with source citations (file paths, module names).
+    - **Implicit responsibilities** — Infrastructure, knowledge, and
+      maintenance that users/agents never see but would otherwise bear.
+    - **Compounding value** — How this layer's value multiplies with
+      layers below it.
+
+    ### 3. Cross-Cutting Concerns
+    Responsibilities that span multiple layers:
+    - Security (signing, auth, access control across all layers)
+    - Observability (receipt chain, logging, metrics)
+    - Error handling (taxonomy, retries, graceful degradation)
+    - State management (lockers, instances, memory)
+
+    ### 4. The Multiplicative Thesis
+    A concrete walkthrough: if a developer wanted to replicate the full
+    NukezAgent experience from scratch, what is the complete inventory
+    of infrastructure, code, knowledge, and ongoing maintenance required
+    at each layer? Show how the effort compounds.
+
+    ### 5. Value Gradient Table
+    A table with columns: Responsibility | Gateway | PyNukez | MCP | Agent |
+    showing where each responsibility is absorbed and what it would cost
+    to self-implement.
+
+    ## Refinement Criteria (Iteration 2)
+
+    When reviewing the first pass, focus on:
+    1. **Completeness** — Are there responsibilities that were missed?
+       Check every module, every route, every tool definition.
+    2. **Accuracy** — Are source citations correct? Do the claims match
+       the actual code?
+    3. **Implicit value gaps** — Did the analysis adequately capture the
+       non-obvious burdens (billing setup, IAM, compliance, knowledge
+       acquisition)?
+    4. **Compounding logic** — Is the multiplicative argument rigorous
+       or hand-wavy? Each compounding claim needs a concrete example.
+
+    Do NOT pad with filler. Every sentence must either identify a
+    responsibility, cite a source, or make a compounding argument.
+
+  keywords:
+    researcher:
+      - infrastructure
+      - cloud
+      - IAM
+      - billing
+      - compliance
+      - cost
+      - setup
+      - knowledge
+      - effort
+      - alternative
+      - competing
+      - from scratch
+      - otherwise
+      - implicit
+      - non-obvious
+      - hidden
+      - burden
+      - maintenance
+      - HSM
+      - key management
+      - RPC node
+      - gas
+
+    analysis_team:
+      - gateway
+      - pynukez
+      - sdk
+      - mcp
+      - agent
+      - nukez
+      - storage
+      - receipt
+      - signing
+      - locker
+      - provision
+      - payment
+      - attestation
+      - merkle
+      - operator
+      - wallet
+      - tool
+      - route
+      - endpoint
+      - explicit
+      - code
+      - module
+      - layer
+
+  agents:
+    # ══════════════════════════════════════════════════════════
+    # Researcher — External context on infra costs & knowledge
+    # ══════════════════════════════════════════════════════════
+    researcher:
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Infrastructure and knowledge-burden researcher. Provides external
+        context on what it actually takes to build, configure, and maintain
+        the cloud infrastructure, cryptographic systems, blockchain
+        integrations, and IAM policies that Nukez abstracts away.
+        Answers the "what would you otherwise need to do?" question
+        for each layer of the stack.
+      system_prompt: |
+        You are a senior infrastructure and platform engineering researcher.
+        Your role is to provide rigorous, specific answers about the REAL
+        costs and complexity of building and maintaining the systems that
+        Nukez absorbs on behalf of its users.
+
+        You are NOT analyzing the Nukez codebase. You are providing the
+        COUNTERFACTUAL: what a developer or agent would need to do WITHOUT
+        Nukez at each layer.
+
+        Be specific and technical. Cite concrete AWS/GCP/Azure services,
+        specific IAM permissions, actual cost ranges where known. Do not
+        generalize. The reader is technical — give them the real picture.
+
+        When you don't have specific data, say so — don't fabricate numbers.
+        Distinguish between your direct knowledge and estimates.
+
+    # ══════════════════════════════════════════════════════════
+    # Analysis Team (Opus 4.6)
+    # ══════════════════════════════════════════════════════════
+    analysis_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      max_workers: 8
+      description: >
+        Analysis team for the Nukez value chain decomposition.
+        Routes to 4 domain-specific sub-agents covering the gateway,
+        SDK, MCP, and the nukez-agent.
+      routing_prompt_extra: |
+        You lead the analysis team for the Nukez value chain decomposition.
+        Route questions to the appropriate sub-agent by layer:
+
+        - **gateway_expert**: Nukez Gateway (api.nukez.xyz) — the foundational
+          HTTP API. Routes, core modules, storage providers, chain integration,
+          payments, security. This is the largest and most complex layer.
+        - **sdk_expert**: PyNukez SDK — the Python client library. Auth
+          abstraction, type safety, payment orchestration, HTTP resilience,
+          discovery, hardening. NOT just endpoint wrappers.
+        - **mcp_expert**: Nukez MCP server — thick tools for LLM hosts.
+          Tool packaging, state management, auth cascade, transports.
+        - **agent_expert**: NukezAgent — the autonomous storage specialist.
+          Service layer (inference, tools, signing, transports) and AAAP SDK
+          (contracts, adapters, detection). The most value-dense layer.
+
+        For each layer, your analysis must identify:
+        1. Every explicit responsibility the code handles (with source paths)
+        2. The implicit infrastructure/knowledge this displaces
+        3. How this compounds with layers below
+
+        For cross-layer questions (e.g., "how does the signing boundary
+        span gateway through agent?"), query multiple subs and synthesize.
+
+        QUALITY REQUIREMENTS:
+        - Every claim must cite a source file or module
+        - No vague "handles complexity" — name the specific complexity
+        - No feature-list style — frame as responsibility displaced
+        - Distinguish what is BUILT from what is CONFIGURED from what is
+          MAINTAINED
+
+      agents:
+        gateway_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Definitive expert on the Nukez Gateway (api.nukez.xyz) — the
+            foundational HTTP API layer. Covers all routes, core modules,
+            10+ storage providers, chain integration, payments, security,
+            and infrastructure. Identifies every responsibility the gateway
+            absorbs.
+          system_prompt: |
+            You are the definitive expert on the Nukez Gateway (api.nukez.xyz).
+            This is LAYER 0 — the foundational HTTP API that everything above
+            depends on.
+
+            YOUR ANALYTICAL TASK: Identify every responsibility the gateway
+            absorbs on behalf of its users. For each responsibility, document:
+            - What the gateway handles (specific module, specific code)
+            - What a user would otherwise need to build, configure, or maintain
+            - How this relates to higher layers (PyNukez, MCP, Agent)
+
+            AREAS TO COVER (not exhaustive — discover more):
+
+            **Storage infrastructure** — gateway/app/core/meta_store/ and
+            gateway/app/core/storage_providers/ abstract 10+ backends behind
+            a unified interface. The user never touches provider SDKs, IAM,
+            or bucket configuration.
+
+            **Payment & billing** — gateway/app/core/payments.py,
+            evm_payments.py, pricing/ implement the full Solana + EVM payment
+            pipeline. The user doesn't run RPC nodes, monitor transactions,
+            or manage gas.
+
+            **Security** — Ed25519 signature verification (sigverify.py),
+            JWT auth (jwt.py), API keys, SSRF protection (ssrf.py), rate
+            limiting (rate_limit.py), nonce replay protection (nonce_store.py).
+            Each of these is a complete subsystem a user would need to build.
+
+            **Cryptographic attestation** — merkle.py, receipt_proof.py,
+            attest.py, attest_jwt.py implement a complete proof chain. This
+            replaces an entire compliance/audit infrastructure.
+
+            **IAM-equivalent** — Operator delegation, wallet management,
+            locker provisioning. The gateway implements a complete access
+            control system without the user touching cloud IAM.
+
+            **Observability** — event_log.py, metrics.py, observability.py,
+            logging_config.py. Built-in monitoring the user doesn't configure.
+
+            **Job scheduling** — switchboard/ for async payment processing,
+            attestation jobs. Background infrastructure the user never sees.
+
+            **Agent knowledge** — gateway/app/routes/agent_knowledge/ serves
+            14 markdown docs for agent reasoning. Domain knowledge packaged
+            as infrastructure.
+
+            Be exhaustive. Cover every module under gateway/app/core/,
+            gateway/app/routes/, gateway/switchboard/, and gateway/infra/.
+            Cite file paths for every claim.
+          key_files:
+            # --- Routes (the API surface) ---
+            - gateway/app/routes/
+            - gateway/app/routes/__init__.py
+            - gateway/app/routes/storage.py
+            - gateway/app/routes/storage_request.py
+            - gateway/app/routes/storage_confirm.py
+            - gateway/app/routes/files.py
+            - gateway/app/routes/retrieve.py
+            - gateway/app/routes/receipts.py
+            - gateway/app/routes/attest.py
+            - gateway/app/routes/wallets.py
+            - gateway/app/routes/operators.py
+            - gateway/app/routes/locker_routes.py
+            - gateway/app/routes/lockers_v1.py
+            - gateway/app/routes/merkle_proof.py
+            - gateway/app/routes/verification_bundle.py
+            - gateway/app/routes/self_verify.py
+            - gateway/app/routes/recompute_verify.py
+            - gateway/app/routes/owner.py
+            - gateway/app/routes/public_file.py
+            - gateway/app/routes/short_url.py
+            - gateway/app/routes/sandbox_ingest.py
+            - gateway/app/routes/agent.py
+            - gateway/app/routes/agent_logger.py
+            - gateway/app/routes/agent_knowledge/
+            - gateway/app/routes/trichat.py
+            - gateway/app/routes/well_known.py
+            - gateway/app/routes/internal.py
+            - gateway/app/routes/jobs.py
+            # --- Core logic (the engine) ---
+            - gateway/app/core/
+            - gateway/app/core/storage.py
+            - gateway/app/core/storage_pending.py
+            - gateway/app/core/file_ops.py
+            - gateway/app/core/signed_requests.py
+            - gateway/app/core/sigverify.py
+            - gateway/app/core/crypto.py
+            - gateway/app/core/security.py
+            - gateway/app/core/merkle.py
+            - gateway/app/core/receipts.py
+            - gateway/app/core/receipt_proof.py
+            - gateway/app/core/attest.py
+            - gateway/app/core/attest_jwt.py
+            - gateway/app/core/attestations.py
+            - gateway/app/core/payments.py
+            - gateway/app/core/evm_payments.py
+            - gateway/app/core/evm_rpc.py
+            - gateway/app/core/evm_tokens.py
+            - gateway/app/core/evm_keystore.py
+            - gateway/app/core/chain_utils.py
+            - gateway/app/core/bridge.py
+            - gateway/app/core/solana_keypair.py
+            - gateway/app/core/sol_price.py
+            - gateway/app/core/wallets.py
+            - gateway/app/core/jwt.py
+            - gateway/app/core/rate_limit.py
+            - gateway/app/core/ssrf.py
+            - gateway/app/core/nonce_store.py
+            - gateway/app/core/upload_tokens.py
+            - gateway/app/core/upload_error_taxonomy.py
+            - gateway/app/core/event_log.py
+            - gateway/app/core/fingerprint.py
+            - gateway/app/core/jobs.py
+            - gateway/app/core/metrics.py
+            - gateway/app/core/observability.py
+            - gateway/app/core/logging_config.py
+            - gateway/app/core/settings.py
+            - gateway/app/core/short_url.py
+            - gateway/app/core/sandbox_ingest.py
+            - gateway/app/core/owner_viewer.py
+            - gateway/app/core/treasury_ledger.py
+            - gateway/app/core/task_queue.py
+            - gateway/app/core/facilitator/
+            - gateway/app/core/meta_store/
+            - gateway/app/core/pricing/
+            - gateway/app/core/storage_providers/
+            # --- Application surface ---
+            - gateway/app/main.py
+            - gateway/app/schemas.py
+            - gateway/app/__init__.py
+            # --- Infrastructure ---
+            - gateway/switchboard/
+            - gateway/infra/
+            - gateway/contracts/
+            - gateway/scripts/
+            # --- Deployment ---
+            - Dockerfile
+            - Makefile
+            - pyproject.toml
+            - env.deploy.yaml
+            - README.md
+
+        sdk_expert:
+          repo_path: /Users/zhanson/pynukez
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Definitive expert on the PyNukez SDK — the foundational Python
+            client library. Identifies every responsibility the SDK absorbs
+            beyond raw HTTP endpoint wrapping: auth abstraction, type safety,
+            payment orchestration, error taxonomy, resilience, discovery,
+            and security hardening.
+          system_prompt: |
+            You are the definitive expert on the PyNukez SDK (pynukez v3.1.0).
+            This is LAYER 1 — the Python client library that all higher
+            layers (MCP, Agent) depend on.
+
+            YOUR ANALYTICAL TASK: Identify every responsibility the SDK
+            absorbs BEYOND being a thin wrapper around Gateway endpoints.
+            For each responsibility, document:
+            - What the SDK handles (specific module, specific code)
+            - What a developer would otherwise need to implement
+            - How this compounds with the Gateway below it
+
+            The user specifically wants to understand: "PyNukez is not merely
+            python packaging around endpoints, it's much greater than that."
+            Your job is to prove this claim with evidence.
+
+            AREAS TO COVER (not exhaustive — discover more):
+
+            **Auth abstraction** — pynukez/auth.py: Keypair class wraps Ed25519
+            keypair management. build_signed_envelope() constructs cryptographic
+            request envelopes. compute_locker_id() deterministically generates
+            locker IDs. The developer never touches raw crypto primitives.
+
+            **Type safety** — pynukez/types.py: Receipt, FileUrls, FileInfo,
+            StorageRequest — structured domain types that eliminate raw JSON
+            parsing and provide IDE completion/validation.
+
+            **Payment orchestration** — pynukez/payment.py and evm_payment.py:
+            Full Solana + EVM payment flows abstracted into method calls. The
+            developer doesn't build transaction construction, gas estimation,
+            or confirmation monitoring.
+
+            **HTTP resilience** — pynukez/_http.py: Retry logic, timeout
+            handling, connection pooling. Production-grade HTTP client behavior
+            the developer doesn't implement.
+
+            **Error taxonomy** — pynukez/errors.py: Classified errors with
+            retry hints. Transient vs permanent distinction enables intelligent
+            retry strategies without the developer classifying errors.
+
+            **Security hardening** — pynukez/hardening.py: Request validation,
+            envelope integrity checks. Defense-in-depth the developer would
+            otherwise need to design.
+
+            **Zero-knowledge discovery** — pynukez/discovery.py: Service
+            discovery without leaking intent. Privacy-preserving bootstrapping.
+
+            **Client orchestration** — pynukez/client.py: The Nukez class
+            orchestrates multi-step flows (request_storage → confirm_storage →
+            provision_locker) that would otherwise require the developer to
+            understand and sequence gateway API calls correctly.
+
+            Be exhaustive. Cover every module in the pynukez/ package.
+            Cite file paths for every claim.
+          key_files:
+            # --- Core package ---
+            - pynukez/__init__.py
+            - pynukez/client.py
+            - pynukez/auth.py
+            - pynukez/types.py
+            - pynukez/_http.py
+            - pynukez/errors.py
+            - pynukez/payment.py
+            - pynukez/evm_payment.py
+            - pynukez/hardening.py
+            - pynukez/discovery.py
+            # --- Docs ---
+            - docs/
+            - docs/API.md
+            - docs/QUICKSTART.md
+            - docs/integrations/
+            # --- Configuration & packaging ---
+            - pyproject.toml
+            - README.md
+
+        mcp_expert:
+          repo_path: /Users/zhanson/nukez-mcp
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Expert on the Nukez MCP server — the Model Context Protocol
+            integration layer. Identifies every responsibility the MCP
+            server absorbs: tool packaging, state management, auth cascade,
+            transport abstraction, memory module, and diagnostics.
+          system_prompt: |
+            You are the expert on the Nukez MCP server (nukez-mcp v1.1.0).
+            This is LAYER 2 — the MCP server that exposes Nukez storage as
+            thick tools for LLM hosts (Claude Desktop, Cursor, etc.).
+
+            YOUR ANALYTICAL TASK: Identify every responsibility the MCP
+            server absorbs on behalf of LLM hosts and their users.
+            For each responsibility, document:
+            - What the MCP server handles (specific module, specific code)
+            - What a developer would otherwise need to implement to give
+              their LLM host storage capabilities
+            - How this compounds with PyNukez (Layer 1) below it
+
+            AREAS TO COVER (not exhaustive — discover more):
+
+            **Tool packaging** — 8 thick MCP tools with parameter schemas,
+            return types, and descriptions. Each tool is a complete capability,
+            not a thin endpoint proxy. The developer doesn't design tool
+            contracts, write schema definitions, or handle parameter validation.
+
+            **State management** — state.py + state_backend.py provide
+            persistent state across tool invocations. LLM hosts are stateless
+            by default — the MCP server bridges this gap.
+
+            **Auth cascade** — Keypair resolution from environment variables,
+            file paths, or auto-generation. The LLM host never handles crypto.
+
+            **Transport abstraction** — stdio + SSE transports for different
+            host environments. The developer doesn't implement MCP transport.
+
+            **Memory module** — memory.py provides structured key-value storage
+            for LLM contexts. This is a complete memory layer the developer
+            would otherwise need to build.
+
+            **Tool manifest** — tool_manifest.py provides formal MCP tool
+            definitions. The developer doesn't write MCP schema JSON.
+
+            **Diagnostics** — Tracing and debugging for MCP tool invocations.
+
+            **PyNukez integration** — The MCP server wraps pynukez methods,
+            meaning all of Layer 1's value (auth, types, resilience, etc.)
+            is inherited transparently.
+
+            Be exhaustive. Cover every module in the nukez-mcp package.
+            Cite file paths for every claim.
+          key_files:
+            # --- Core server ---
+            - server.py
+            - thick_tools.py
+            - tool_manifest.py
+            - state.py
+            - state_backend.py
+            - memory.py
+            # --- Infrastructure ---
+            - entrypoint.py
+            - Dockerfile
+            - pyproject.toml
+            - README.md
+            # --- Diagnostics ---
+            - diagnostics/
+
+        agent_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Definitive expert on the NukezAgent — the autonomous storage
+            specialist sub-agent. Covers both the deployed service (service/)
+            and the AAAP SDK (python/nukez/). Identifies every responsibility
+            the agent absorbs including intent translation, signing boundary,
+            operator delegation, multi-transport, AAAP contracts, instance
+            lifecycle, and framework integration.
+          system_prompt: |
+            You are the definitive expert on the NukezAgent.
+            This is LAYER 3 — the autonomous storage specialist sub-agent
+            at the top of the Nukez value chain.
+
+            YOUR ANALYTICAL TASK: Identify every responsibility the NukezAgent
+            absorbs on behalf of developers and their agent systems.
+            For each responsibility, document:
+            - What the agent handles (specific module, specific code)
+            - What a developer/agent system would otherwise need to implement
+            - How this compounds with ALL layers below (Gateway + PyNukez + MCP)
+
+            This is the MOST VALUE-DENSE layer because it inherits everything
+            below and adds autonomous reasoning, security boundaries, and
+            interoperability contracts.
+
+            AREAS TO COVER — SERVICE LAYER (service/):
+
+            **Intent translation** — inference.py + tools.py: Natural language
+            → storage operations via Claude tool-use loop. The developer's
+            system says "save this file" and the agent handles everything.
+
+            **Signing boundary** — signing.py: SignatureRequired flow,
+            EnvelopeBuilder, operator delegation. The agent NEVER possesses
+            owner keys or executes crypto transfers. This is a complete
+            trust model the developer doesn't design.
+
+            **Tool execution** — tools.py: 9 TOOL_DEFINITIONS covering
+            store, retrieve, list, delete, verify, status, provision,
+            store_memory, recall_memory. Each tool is a complete workflow.
+
+            **Multi-transport** — app.py (HTTP), mcp_adapter.py (MCP),
+            a2a_adapter.py (A2A). Three ways to reach the same agent core.
+
+            **Instance lifecycle** — instance_manager.py: Per-developer
+            instances with state isolation. The developer doesn't build
+            multi-tenancy.
+
+            **Rate limiting** — rate_limiter.py: Token-bucket rate limiting
+            per instance. Built-in abuse protection.
+
+            AREAS TO COVER — AAAP SDK (python/nukez/):
+
+            **Context Envelope** — envelope.py: Formal invocation contract
+            with goal, facts, constraints, artifacts, lineage. The developer
+            doesn't design agent communication protocols.
+
+            **Typed Artifacts** — artifacts.py: Structured output contract
+            with provenance, content hash, retention policy. The developer
+            gets auditable outputs without building the audit system.
+
+            **Capability schemas** — contracts/capabilities/: 12 JSON schemas
+            defining input/output for each operation. Interoperability without
+            the developer writing schema definitions.
+
+            **Side effects & failure taxonomy** — contracts/: Declared side
+            effects and classified errors. The consuming system knows exactly
+            what the agent can do and how it can fail.
+
+            **Framework adapters** — adapters/standalone.py, adapters/crewai.py:
+            Drop-in integration with agent frameworks.
+
+            **Session ledger** — ledger.py: Operation history as a first-class
+            data structure. Audit trail without building logging.
+
+            **Manifest & discovery** — manifest/agent.json, agent-card.json:
+            Agent identity and capability advertisement. The agent is
+            discoverable without the developer building discovery.
+
+            Be exhaustive. Cover EVERY file under service/, python/nukez/,
+            contracts/, and manifest/. Cite file paths for every claim.
+          key_files:
+            # --- Service layer (the deployed agent) ---
+            - service/
+            - service/agent.py
+            - service/inference.py
+            - service/tools.py
+            - service/signing.py
+            - service/mcp_adapter.py
+            - service/a2a_adapter.py
+            - service/app.py
+            - service/instance_manager.py
+            - service/state.py
+            - service/models.py
+            - service/config.py
+            - service/rate_limiter.py
+            # --- AAAP SDK ---
+            - python/nukez/
+            - python/nukez/adapters/standalone.py
+            - python/nukez/adapters/crewai.py
+            - python/nukez/envelope.py
+            - python/nukez/artifacts.py
+            - python/nukez/ledger.py
+            - python/nukez/manifest.py
+            - python/nukez/auth.py
+            - python/nukez/detect.py
+            # --- Contracts ---
+            - contracts/
+            - contracts/context_envelope.md
+            - contracts/context_envelope.schema.json
+            - contracts/artifact.schema.json
+            - contracts/side_effects.md
+            - contracts/failure_taxonomy.md
+            - contracts/capabilities/
+            # --- Manifest ---
+            - manifest/
+            - manifest/agent.json
+            - manifest/agent-card.json
+            # --- Top-level ---
+            - README.md
+            - pyproject.toml
+
+disable_files_agent: true

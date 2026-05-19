@@ -1,0 +1,709 @@
+# yaml-language-server: $schema=
+name: plan-free-mcp
+
+# ============================================================
+# Free-Tier Devnet MCP — Architecture & Implementation Plan
+# ============================================================
+# Cross-cutting planning stack: designs the free devnet MCP for
+# LLM-provider native apps (Claude iOS, Claude.app, ChatGPT, etc.)
+#
+# Unlike master_docs.yaml, there is NO single focus repo.
+# The lead routes by domain across all four teams + prior research.
+#
+# Architecture (15 agents):
+#   Lead (Opus 4.6) — systems architect
+#     → prior_research (Sonnet 4) — reads completed doc reports
+#     → mcp_team (Coordinator, Opus 4.6) — PRIMARY stakeholder
+#       → mcp_expert (gpt-5.4)
+#     → gateway_team (Coordinator, Opus 4.6) — backend changes
+#       → routes_expert (gpt-5.4)
+#       → switchboard_expert (Sonnet 4)
+#       → app_expert (Sonnet 4)
+#       → core_expert (Opus 4.6)
+#     → pynukez_team (Coordinator, Opus 4.6) — auth model changes
+#       → sdk_expert (gpt-5.4)
+#     → agent_team (Coordinator, Opus 4.6) — impact/discrimination
+#       → agent_expert (gpt-5.4)
+#       → infra_expert (Sonnet 4)
+#
+# Run:
+#   maz --config stacks/plan_free_mcp.yaml
+#   [paste the planning prompt]
+# ============================================================
+
+orchestration:
+  mode: perspective
+  max_iterations: 2
+
+lead:
+  model: claude-opus-4-6
+  provider: anthropic
+
+  routing_prompt_extra: |
+    You are a systems architect planning a major cross-cutting feature
+    for the Nukez decentralized storage ecosystem: a FREE-TIER DEVNET
+    MCP that ships inside LLM-provider native applications (Claude iOS,
+    Claude.app, ChatGPT desktop, etc.).
+
+    This is a PLANNING task, not documentation. You are producing
+    concrete architecture decisions and a phased implementation plan.
+
+    ## Your Teams
+
+    **prior_research** — Contains completed comprehensive documentation
+    (Architecture, API Reference, Integration Guide) for all four Nukez
+    repos. Query this FIRST for any factual question about the current
+    system. These docs are authoritative and cheaper to query than
+    routing through a full team hierarchy. Only route to a team when:
+    - prior_research doesn't cover the specific detail
+    - You need a team to REASON about a design tradeoff (not report facts)
+    - You need fresh code-level verification of a claim
+
+    **mcp_team** — The MCP server (nukez-mcp v1.1.0). PRIMARY stakeholder.
+    This is the codebase being modified most. Knows: MCP protocol,
+    clientInfo detection, transport modes (stdio/SSE/HTTP), thick tools,
+    state management (AgentState lifecycle), entry points, diagnostics.
+    Route: runtime detection, client identification, tool surface changes,
+    MCP distribution model, mainnet/devnet entry point split, state
+    persistence across sessions.
+
+    **gateway_team** — The gateway (api.nukez.xyz). HEAVY involvement.
+    Knows: backend API, storage provisioning flow, payment processing,
+    Solana integration, rate limiting, security hardening, JWT auth.
+    Route: devnet airdrop mechanics, free-tier provisioning API, payment
+    flow bypass vs new endpoint, rate limiting for free tier, anti-abuse
+    measures, identity management, devnet vs mainnet API routing.
+
+    **pynukez_team** — The Python SDK (pynukez v3.1.0). MEDIUM involvement.
+    Knows: Ed25519 auth (Keypair, build_signed_envelope), payment flows,
+    network configuration, client HTTP internals.
+    Route: keypair lifecycle changes for auto-generation, OAuth2/passkey
+    auth additions, devnet SOL handling, network-aware client config,
+    new SDK methods needed for free-tier flow.
+
+    **agent_team** — The autonomous agent (nukez_agent). LIGHT involvement.
+    Knows: agent runtime behavior, tool execution patterns, contract
+    validation, how autonomous agents call the MCP differently from humans.
+    Route: how to discriminate consumer-in-app from autonomous-agent,
+    what behavioral signals differ, impact on existing agent deployments,
+    whether the agent needs to be explicitly blocked from free tier.
+
+    ## Routing Strategy
+
+    Route by domain, not by focus. For each design question:
+    1. Check **prior_research** for baseline facts about the current system
+    2. Route to the **1-2 teams** whose codebase is most affected
+    3. For cross-cutting questions, query **multiple teams** and reconcile
+
+    Expected routing weight:
+    - prior_research: ~15% (factual baseline — always check first)
+    - mcp_team: ~30% (primary target of changes)
+    - gateway_team: ~25% (backend must support free tier)
+    - pynukez_team: ~20% (auth model and SDK changes)
+    - agent_team: ~10% (discrimination signals, impact assessment)
+
+    When you get an answer from prior_research, DO NOT re-ask the same
+    question to a team. Use teams for reasoning about CHANGES, not
+    restating the current state.
+
+    ## Planning Output
+
+    Produce a phased implementation plan with these sections:
+
+    1. **Architecture Decisions** — For each of the 5 design areas
+       (runtime detection, auth model, devnet airdrop, mainnet/devnet
+       split, distribution), state the RECOMMENDED approach with rationale.
+       Do not enumerate options — DECIDE and justify. Reference specific
+       code artifacts (files, functions, classes) that ground the decision.
+
+    2. **API Changes** — Concrete changes on api.nukez.xyz: new endpoints,
+       modified endpoints, new request/response fields, new middleware.
+       Include the HTTP method, path, and purpose for each.
+
+    3. **MCP Server Changes** — New modules, modified tools, new env vars,
+       entry point changes, state management updates. Reference actual
+       filenames in nukez-mcp.
+
+    4. **pynukez SDK Changes** — New methods, auth flow additions,
+       network-aware configuration, keypair management. Reference actual
+       module paths.
+
+    5. **Security Model** — Threat analysis: clientInfo spoofing,
+       airdrop abuse, free-tier resource exhaustion, cross-tier
+       contamination. For each threat, state the mitigation.
+
+    6. **Migration Path** — How existing paid users are unaffected.
+       How free-tier users upgrade to paid/mainnet (identity linking,
+       data migration, keypair continuity).
+
+    7. **Phase Breakdown** — Ordered phases with explicit dependencies.
+       Each phase independently deployable. Include which repos are
+       touched in each phase.
+
+    8. **File-Level Change Map** — Which files to create, modify, or
+       split, organized by repo (nukez-mcp, api.nukez.xyz, pynukez,
+       nukez_agent).
+
+    ## Refinement Criteria (Iteration 2)
+
+    When reviewing your first-pass plan, focus on:
+
+    1. **Cross-repo dependency ordering** — Does the phase plan account
+       for inter-repo dependencies? (e.g., pynukez auth changes must
+       land before MCP can consume them; gateway free-tier endpoint
+       must exist before MCP can call it)
+
+    2. **Security model completeness** — Can a determined attacker spoof
+       clientInfo.name and get free storage? What's the mitigation?
+       Is there an airdrop abuse vector? Rate limit evasion?
+
+    3. **Platform feasibility** — Does the auth approach work on iOS
+       (sandboxed, no filesystem keypair)? On macOS (app restart)?
+       On web (CORS, no local storage from MCP)? Verify against actual
+       codebase constraints from the teams.
+
+    4. **Backward compatibility** — Does ANY proposed change break
+       existing paid/mainnet signed-envelope auth? Verify the existing
+       flow is completely untouched.
+
+    5. **Missing API surface** — Are there endpoints or SDK methods
+       the plan requires but doesn't define? Are there state transitions
+       in AgentState that need new stages?
+
+    Do NOT waste refinement on rewording or restructuring.
+    Focus on feasibility gaps and security holes.
+
+    ## Explicit Cross-Cutting Questions to Resolve
+
+    The following questions span multiple teams and must be explicitly
+    resolved during synthesis — do not leave them implicit:
+
+    1. **Attestation for free-tier lockers**: Do devnet free-tier
+       lockers get on-chain attestation via Switchboard, or is
+       attestation skipped entirely? If skipped, how does the
+       receipt chain maintain integrity? (gateway_team → switchboard_expert
+       + core_expert)
+
+    2. **AAAP / agent contract interaction**: The Nukez ecosystem
+       includes an agent definition contract (AAAP). Does the free-tier
+       MCP need its own agent manifest, or does it inherit the existing
+       one? Does runtime detection interact with the agent contract
+       validation? (mcp_team + agent_team)
+
+    3. **Keypair continuity across tiers**: If a free-tier user
+       upgrades to paid/mainnet, can their existing Ed25519 keypair
+       carry over, or does the devnet→mainnet transition require a
+       new keypair? What happens to their devnet locker data?
+       (pynukez_team + gateway_team)
+
+    4. **iOS transport constraint**: Claude iOS cannot use stdio
+       transport. The free MCP on iOS must use HTTP/SSE. Does the
+       current MCP server support both transports simultaneously,
+       or does it need a dual-entry-point design?
+       (mcp_team → mcp_expert)
+
+  # Keywords: domain-specific discriminators for this planning task.
+  # prior_research gets factual/baseline queries.
+  # Teams get reasoning/design queries for their domain.
+  keywords:
+    prior_research:
+      - current
+      - existing
+      - how does
+      - what is
+      - today
+      - baseline
+      - documentation
+      - describe
+      - explain
+      - overview
+
+    mcp_team:
+      - mcp
+      - fastmcp
+      - thick_tools
+      - tool_manifest
+      - stdio
+      - clientInfo
+      - transport
+      - state_backend
+      - entrypoint
+      - diagnostics
+      - runtime
+      - detection
+      - client_name
+      - initialize
+      - mcp_trace
+
+    gateway_team:
+      - gateway
+      - airdrop
+      - devnet
+      - faucet
+      - provisioning
+      - free_tier
+      - rate_limit
+      - attestation
+      - storage_providers
+      - pricing
+      - solana_keypair
+      - switchboard
+      - ssrf
+      - request_storage
+      - confirm_storage
+      - spoofing
+      - abuse
+
+    pynukez_team:
+      - pynukez
+      - sdk
+      - keypair
+      - signing
+      - envelope
+      - build_signed_envelope
+      - compute_locker_id
+      - oauth
+      - passkey
+      - webauthn
+      - auth
+      - Keypair
+      - network
+      - NUKEZ_NETWORK
+
+    agent_team:
+      - autonomous
+      - agent
+      - discrimination
+      - agent_loop
+      - tool_executor
+      - tool_executor_pattern
+      - phase2_agent
+      - bot
+      - headless
+      - programmatic
+      - behavioral
+
+  agents:
+    # ══════════════════════════════════════════════════════════
+    # Prior Research — completed doc reports for all 4 repos
+    # ══════════════════════════════════════════════════════════
+    # SubAgent (not FileHandlerAgent) for better context budgeting.
+    # key_files listed in priority order for this planning task:
+    # MCP docs first (primary target), then gateway, pynukez, agent.
+    # 600K char budget — will load ~2 files fully, partial third.
+    prior_research:
+      repo_path: /Users/zhanson/x/multiagentz/outputs/docs
+      model: claude-sonnet-4-20250514
+      provider: anthropic
+      description: >
+        Expert on prior documentation research. Has read comprehensive
+        Architecture, API Reference, and Integration Guide documents
+        for all four Nukez repos. Answers factual questions about the
+        current system without needing to re-analyze source code.
+      system_prompt: >
+        You have access to comprehensive documentation for the entire
+        Nukez ecosystem — the MCP server, gateway API, Python SDK, and
+        autonomous agent. These documents were generated from thorough
+        codebase analysis. When asked about the current system, answer
+        from this documentation. Be precise: cite specific module names,
+        method signatures, endpoint paths, and configuration values.
+        If the docs don't cover a specific detail, say so clearly so
+        the lead can route to a codebase team instead.
+      key_files:
+        - Nukez MCP Docs.html
+        - Nukez Gateway 2.0.html
+        - PyNukez_Documentation.html
+        - Nukez Agent.html
+        - General Documentation.html
+
+    # ══════════════════════════════════════════════════════════
+    # Team 1: Nukez MCP Server — PRIMARY stakeholder
+    # ══════════════════════════════════════════════════════════
+    mcp_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Planning team for nukez-mcp (v1.1.0). Primary stakeholder for
+        the free-tier devnet MCP. Covers runtime detection, client
+        identification, transport modes, tool surface, state management,
+        entry point design, and MCP distribution.
+      routing_prompt_extra: |
+        You oversee planning analysis for the nukez-mcp server — the
+        PRIMARY target of the free-tier changes.
+        Route all questions to the mcp_expert. Review its answers for
+        implementability — every proposed change must reference actual
+        files, functions, or configuration points in the codebase.
+
+        When you receive a cross-reference query from the lead (e.g.,
+        "can the MCP detect iOS vs desktop from clientInfo?"), answer
+        directly and concisely with code-grounded specifics. Do not
+        produce full plans — just the specific technical fact or
+        feasibility assessment requested.
+
+      agents:
+        mcp_expert:
+          repo_path: /Users/zhanson/nukez-mcp
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Definitive expert on the Nukez MCP server. Full codebase
+            access. Answers questions about runtime detection, client
+            identification, transport modes, tool surface, state
+            management, and implementation feasibility.
+          system_prompt: >
+            You are the definitive expert on nukez-mcp (v1.1.0). You
+            have read every source file. For this planning task, focus
+            on: how clientInfo is parsed in the initialize flow, what
+            transport modes are available (stdio/SSE/HTTP), the
+            AgentState lifecycle and persistence tiers, the 10 thick
+            tools and which would change for free-tier, the keypair
+            resolution cascade in server.py, and how entry points could
+            be split for mainnet vs devnet. Ground every answer in
+            actual code — file paths, function names, line numbers.
+          key_files:
+            - nukez_mcp/__init__.py
+            - nukez_mcp/__main__.py
+            - nukez_mcp/server.py
+            - nukez_mcp/thick_tools.py
+            - nukez_mcp/tool_manifest.py
+            - nukez_mcp/memory.py
+            - nukez_mcp/state.py
+            - nukez_mcp/state_backend.py
+            - nukez_mcp/tests/
+            - diagnostics/
+            - entrypoint.py
+            - Dockerfile
+            - pyproject.toml
+            - README.md
+
+    # ══════════════════════════════════════════════════════════
+    # Team 2: Nukez Gateway — backend changes
+    # ══════════════════════════════════════════════════════════
+    gateway_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      max_workers: 8
+      description: >
+        Planning team for the Nukez gateway (api.nukez.xyz). Covers
+        free-tier provisioning, devnet airdrop mechanics, payment flow
+        bypass, rate limiting, anti-abuse, and identity management.
+      routing_prompt_extra: |
+        You oversee planning analysis for the Nukez gateway — the
+        backend that must support the free-tier devnet flow.
+        Four sub-agents cover different domains:
+        - **routes_expert**: API endpoints — what new routes are needed
+        - **switchboard_expert**: Payment/attestation job changes
+        - **app_expert**: FastAPI middleware, schemas, CORS
+        - **core_expert**: Storage provisioning, auth, Solana integration
+
+        For planning questions, route to the 1-2 most relevant subs.
+        For "what new API endpoint do we need?" → routes_expert.
+        For "how does airdrop work?" → core_expert.
+        For "how to rate-limit free tier?" → core_expert + app_expert.
+
+        When you receive a cross-reference query from the lead,
+        answer directly and concisely. Route to the single relevant
+        sub-agent only — do not fan out to all four.
+
+      agents:
+        routes_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Expert on gateway route handlers. Knows every endpoint,
+            HTTP method, path, auth requirement, and schema.
+          system_prompt: >
+            You are the expert on the Nukez gateway's route handlers.
+            For this planning task, focus on: what new endpoints would
+            be needed for free-tier provisioning (e.g., /v1/free-setup),
+            how existing storage routes handle network (devnet/mainnet),
+            where rate limiting middleware is applied, and what the
+            CORS configuration looks like for LLM-provider origins.
+          key_files:
+            - gateway/app/routes/__init__.py
+            - gateway/app/routes/storage.py
+            - gateway/app/routes/storage_request.py
+            - gateway/app/routes/storage_confirm.py
+            - gateway/app/routes/files.py
+            - gateway/app/routes/retrieve.py
+            - gateway/app/routes/receipts.py
+            - gateway/app/routes/attest.py
+            - gateway/app/routes/wallets.py
+            - gateway/app/routes/operators.py
+            - gateway/app/routes/locker_routes.py
+            - gateway/app/routes/lockers_v1.py
+            - gateway/app/routes/merkle_proof.py
+            - gateway/app/routes/verification_bundle.py
+            - gateway/app/routes/self_verify.py
+            - gateway/app/routes/recompute_verify.py
+            - gateway/app/routes/owner.py
+            - gateway/app/routes/public_file.py
+            - gateway/app/routes/short_url.py
+            - gateway/app/routes/sandbox_ingest.py
+            - gateway/app/routes/agent.py
+            - gateway/app/routes/agent_logger.py
+            - gateway/app/routes/agent_knowledge/
+            - gateway/app/routes/trichat.py
+            - gateway/app/routes/well_known.py
+            - gateway/app/routes/internal.py
+            - gateway/app/routes/jobs.py
+
+        switchboard_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on gateway switchboard and payment infrastructure.
+          system_prompt: >
+            You are the expert on the Nukez gateway's switchboard and
+            payment infrastructure. For this planning task, focus on:
+            how payment processing jobs work, whether the free-tier
+            can bypass the payment flow entirely, what attestation
+            changes are needed for devnet-only lockers, and whether
+            the 402 protocol needs a free-tier exception path.
+          key_files:
+            - gateway/switchboard/
+            - gateway/infra/arweave-sidecar/
+            - gateway/contracts/
+            - gateway/scripts/
+
+        app_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on gateway application surface — FastAPI setup,
+            schemas, middleware, CORS, and configuration.
+          system_prompt: >
+            You are the expert on the Nukez gateway's FastAPI application
+            layer. For this planning task, focus on: CORS configuration
+            for LLM-provider origins, middleware chain for free-tier
+            detection, request schema changes for network-aware
+            provisioning, and how to add free-tier rate limiting
+            middleware without affecting paid-tier performance.
+          key_files:
+            - gateway/__init__.py
+            - gateway/app/__init__.py
+            - gateway/app/main.py
+            - gateway/app/schemas.py
+            - Dockerfile
+            - Makefile
+            - pyproject.toml
+            - env.deploy.yaml
+            - README.md
+
+        core_expert:
+          repo_path: /Users/zhanson/Desktop/Nukez
+          model: claude-opus-4-6
+          provider: anthropic
+          description: >
+            Expert on gateway core — storage, auth, Solana integration,
+            payments, merkle, receipts, rate limiting, security.
+          system_prompt: >
+            You are the expert on the Nukez gateway's core modules.
+            For this planning task, focus on: Solana devnet airdrop
+            mechanics (requestAirdrop RPC vs custom faucet), how
+            request_storage/confirm_storage could be bypassed or
+            modified for free-tier, rate limiting implementation,
+            signed request verification (can it coexist with a
+            simpler free-tier auth?), and how locker provisioning
+            distinguishes devnet from mainnet.
+          key_files:
+            - gateway/app/core/__init__.py
+            - gateway/app/core/storage.py
+            - gateway/app/core/storage_pending.py
+            - gateway/app/core/file_ops.py
+            - gateway/app/core/signed_requests.py
+            - gateway/app/core/sigverify.py
+            - gateway/app/core/crypto.py
+            - gateway/app/core/security.py
+            - gateway/app/core/merkle.py
+            - gateway/app/core/receipts.py
+            - gateway/app/core/receipt_proof.py
+            - gateway/app/core/attest.py
+            - gateway/app/core/attest_jwt.py
+            - gateway/app/core/attestations.py
+            - gateway/app/core/payments.py
+            - gateway/app/core/evm_payments.py
+            - gateway/app/core/evm_rpc.py
+            - gateway/app/core/evm_tokens.py
+            - gateway/app/core/evm_keystore.py
+            - gateway/app/core/chain_utils.py
+            - gateway/app/core/bridge.py
+            - gateway/app/core/solana_keypair.py
+            - gateway/app/core/sol_price.py
+            - gateway/app/core/wallets.py
+            - gateway/app/core/jwt.py
+            - gateway/app/core/rate_limit.py
+            - gateway/app/core/ssrf.py
+            - gateway/app/core/nonce_store.py
+            - gateway/app/core/upload_tokens.py
+            - gateway/app/core/upload_error_taxonomy.py
+            - gateway/app/core/event_log.py
+            - gateway/app/core/fingerprint.py
+            - gateway/app/core/jobs.py
+            - gateway/app/core/metrics.py
+            - gateway/app/core/observability.py
+            - gateway/app/core/logging_config.py
+            - gateway/app/core/settings.py
+            - gateway/app/core/short_url.py
+            - gateway/app/core/sandbox_ingest.py
+            - gateway/app/core/owner_viewer.py
+            - gateway/app/core/treasury_ledger.py
+            - gateway/app/core/task_queue.py
+            - gateway/app/core/facilitator/
+            - gateway/app/core/meta_store/
+            - gateway/app/core/pricing/
+            - gateway/app/core/storage_providers/
+            - tests/
+
+    # ══════════════════════════════════════════════════════════
+    # Team 3: PyNukez SDK — auth model changes
+    # ══════════════════════════════════════════════════════════
+    pynukez_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Planning team for the pynukez Python SDK (v3.1.0). Covers
+        keypair lifecycle changes, OAuth2/passkey auth additions,
+        devnet SOL handling, and network-aware client configuration.
+      routing_prompt_extra: |
+        You oversee planning analysis for the pynukez SDK — the auth
+        model and client library that all other repos depend on.
+        Route all questions to the sdk_expert.
+
+        When you receive a cross-reference query from the lead
+        (e.g., "does pynukez support auto-generating keypairs?"),
+        answer directly and concisely with code-grounded specifics.
+
+      agents:
+        sdk_expert:
+          repo_path: /Users/zhanson/pynukez
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Definitive expert on the pynukez SDK. Full codebase access.
+            Answers questions about auth, keypair management, payment
+            flows, and what SDK changes are needed for free-tier.
+          system_prompt: >
+            You are the definitive expert on the pynukez Python SDK
+            (v3.1.0). For this planning task, focus on: the Keypair
+            class and Ed25519 signing (auth.py), build_signed_envelope
+            and compute_locker_id, the payment flow (payment.py,
+            evm_payment.py), network configuration (NUKEZ_NETWORK),
+            and what new methods or auth flows would be needed to
+            support: (a) auto-generated ephemeral keypairs for free
+            tier, (b) OAuth2 token-based auth as an alternative to
+            signed envelopes, (c) passkey/WebAuthn integration,
+            (d) devnet SOL airdrop triggering from the client side.
+            Ground every answer in actual code.
+          key_files:
+            - pynukez/__init__.py
+            - pynukez/client.py
+            - pynukez/auth.py
+            - pynukez/types.py
+            - pynukez/_http.py
+            - pynukez/errors.py
+            - pynukez/payment.py
+            - pynukez/evm_payment.py
+            - pynukez/hardening.py
+            - pynukez/discovery.py
+            - docs/API.md
+            - docs/QUICKSTART.md
+            - docs/TOOL_PATTERN.md
+            - docs/integrations/
+            - examples/
+            - tests/
+            - README.md
+            - pyproject.toml
+
+    # ══════════════════════════════════════════════════════════
+    # Team 4: NukezAgent — impact & discrimination
+    # ══════════════════════════════════════════════════════════
+    agent_team:
+      type: coordinator
+      model: claude-opus-4-6
+      provider: anthropic
+      description: >
+        Planning team for nukez_agent. Lightest involvement — covers
+        impact assessment, consumer-vs-agent discrimination signals,
+        and whether autonomous agents should be blocked from free tier.
+      routing_prompt_extra: |
+        You oversee planning analysis for the nukez_agent.
+        Two sub-agents cover different domains:
+        - **agent_expert**: Agent runtime, tool execution, behavioral
+          patterns that distinguish agents from humans.
+        - **infra_expert**: Client config, tooling contracts, how the
+          agent's MCP client identifies itself.
+
+        Route accordingly. For "how does the agent call the MCP
+        differently from a human in Claude Desktop?" → both.
+
+        When you receive a cross-reference query from the lead,
+        answer directly and concisely.
+
+      agents:
+        agent_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent
+          model: gpt-5.4
+          provider: openai
+          description: >
+            Expert on the autonomous agent core — runtime behavior,
+            tool execution patterns, and how it differs from human
+            MCP usage.
+          system_prompt: >
+            You are the expert on the nukez_agent autonomous agent.
+            For this planning task, focus on: how the agent calls MCP
+            tools (timing, frequency, patterns), what clientInfo.name
+            it would report, whether it uses stdio or HTTP transport,
+            how its behavioral fingerprint differs from a human using
+            Claude Desktop, and what would break if free-tier devnet
+            access were blocked for autonomous agents. Ground answers
+            in actual code — reference main.py, tool_executor.py,
+            settings.yaml.
+          key_files:
+            - autonomous_agent/__init__.py
+            - autonomous_agent/main.py
+            - autonomous_agent/llm.py
+            - autonomous_agent/tool_executor.py
+            - autonomous_agent/fetcher.py
+            - autonomous_agent/payment.py
+            - autonomous_agent/logger.py
+            - autonomous_agent/phase2_agent.py
+            - autonomous_agent/test_contracts.py
+            - autonomous_agent/test_phase2_integration.py
+            - autonomous_agent/test_autonomous_discovery.py
+            - main.py
+            - config/settings.yaml
+            - docs/AGENT_BRIEFING.md
+
+        infra_expert:
+          repo_path: /Users/zhanson/Desktop/nukezAgent
+          model: claude-sonnet-4-20250514
+          provider: anthropic
+          description: >
+            Expert on nukez_agent infrastructure — client config,
+            tooling contracts, MCP client identification.
+          system_prompt: >
+            You are the expert on the nukez_agent infrastructure.
+            For this planning task, focus on: how the agent configures
+            its MCP client connection, what client name/version it
+            reports, what transport it uses, and how its tooling
+            contracts differ from a human user's MCP session.
+          key_files:
+            - nukez_client/__init__.py
+            - nukez_client/client.py
+            - nukez_client/config.py
+            - nukez_client/llm_factory.py
+            - tooling/
+            - scripts/
+            - docs/VERIFICATION_GUIDE.md
+            - requirements.txt
+            - pyproject.toml
+            - README.md
+
+disable_files_agent: true

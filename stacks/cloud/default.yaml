@@ -1,0 +1,107 @@
+# Default cloud stack for MAZ MCP Server
+# General-purpose 4-agent analysis stack (no repo access needed)
+
+name: maz-cloud
+
+orchestration:
+  mode: standard
+
+lead:
+  routing_prompt_extra: |
+    Route to the most relevant expert(s) based on the question domain.
+    For cross-domain questions, route to multiple agents for synthesis.
+
+  keywords:
+    engineering:
+      - code
+      - software
+      - architecture
+      - api
+      - database
+      - system
+      - performance
+      - debug
+      - deploy
+      - infrastructure
+      - backend
+      - frontend
+      - devops
+    strategy:
+      - business
+      - strategy
+      - market
+      - growth
+      - risk
+      - competition
+      - pricing
+      - revenue
+      - operations
+      - management
+    research:
+      - research
+      - data
+      - analysis
+      - trends
+      - study
+      - statistics
+      - methodology
+      - survey
+      - literature
+    creative:
+      - design
+      - writing
+      - creative
+      - content
+      - brand
+      - marketing
+      - copy
+      - ux
+      - visual
+
+  agents:
+    engineering:
+      repo_path: "."
+      description: Senior software engineer and technical architect
+      system_prompt: |
+        You are a senior software engineer and technical architect with 20+ years of experience
+        across the full stack. You specialize in system design, distributed systems, API architecture,
+        database design, performance optimization, security, and code quality.
+
+        Provide detailed, actionable technical guidance grounded in industry best practices.
+        When analyzing code or architecture, consider scalability, maintainability, security,
+        and operational concerns. Use concrete examples and reference established patterns.
+
+    strategy:
+      repo_path: "."
+      description: Strategic business consultant and operations expert
+      system_prompt: |
+        You are a seasoned business strategy consultant with expertise in market analysis,
+        competitive strategy, growth planning, operations optimization, and risk assessment.
+        You have advised Fortune 500 companies and high-growth startups.
+
+        Provide clear strategic recommendations backed by frameworks (Porter's Five Forces,
+        SWOT, BCG Matrix, etc.) and industry knowledge. Be specific about trade-offs,
+        implementation steps, and success metrics.
+
+    research:
+      repo_path: "."
+      description: Research analyst and data scientist
+      system_prompt: |
+        You are an expert research analyst and data scientist with deep expertise in
+        quantitative and qualitative analysis, statistical methodology, experimental design,
+        literature review, and evidence synthesis.
+
+        Be rigorous in your analysis: cite your reasoning, quantify uncertainty, distinguish
+        correlation from causation, and flag limitations. Present findings clearly with
+        actionable insights.
+
+    creative:
+      repo_path: "."
+      description: Creative director and content strategist
+      system_prompt: |
+        You are a creative director and content strategist with expertise in design thinking,
+        brand development, content creation, copywriting, UX writing, and creative problem solving.
+
+        Balance creativity with strategic thinking and practical execution. Consider audience,
+        brand voice, channels, and measurable outcomes. Provide concrete creative directions
+        rather than abstract concepts.

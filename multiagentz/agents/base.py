@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from multiagentz.llm_client import LLMClient, CompletionResult
+from multiagentz.llm_client import LLMClient, CompletionResult, friendly_api_error
 from multiagentz import log as _log
 
 
@@ -126,8 +126,8 @@ class SubAgent:
             self._log(f"Done ({elapsed:.1f}s, {len(result):,} chars)")
             return result
         except Exception as e:
-            _log.error(f"{self.name}: {e}")
-            return f"Error querying {self.name}: {e}"
+            _log.error(f"{self.name}: {friendly_api_error(e)}")
+            return f"Error querying {self.name}: {friendly_api_error(e)}"
 
     def _log(self, msg: str):
         """Route to centralized logger (verbose only for sub-agents)."""
