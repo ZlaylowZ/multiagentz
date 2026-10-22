@@ -1,4 +1,4 @@
-FROM python:3.12.15-slim
+FROM python:3.12.15-slim@sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2
 
 # ── Security (eMudhra/emSign CA incident, 2026-10-22) ───────────
 # 1. Upgrade the OS CA bundle first, as root, before anything talks TLS.
