@@ -8,6 +8,10 @@ dependencies = [
     "rich>=13.0",
     "python-dotenv>=1.0",
     "httpx>=0.27",
+    # Security floor (eMudhra/emSign CA incident, 2026-10-22): certifi
+    # 2026.10.19+ removes the compromised emSign roots. httpx/anthropic/openai
+    # all trust certifi's bundle for their HTTPS calls.
+    "certifi>=2026.10.19",
 ]
 
 [project.optional-dependencies]
